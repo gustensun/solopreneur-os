@@ -30,7 +30,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn, generateId } from '@/lib/utils';
-import { getAnthropicClient } from '@/lib/ai';
+import { getAnthropicClient, resolveApiKey } from '@/lib/ai';
 import { useUserStore } from '@/stores/user';
 import { useContextStore } from '@/stores/context';
 import {
@@ -1225,10 +1225,10 @@ export default function EmailStudioPage() {
   const handleGenerate = useCallback(async () => {
     setGenerating(true);
 
-    if (user.anthropicApiKey) {
+    if (resolveApiKey(user.anthropicApiKey)) {
       const toastId = toast.loading(`Generating ${tabMeta.label} with Claude AI…`);
       try {
-        const client = getAnthropicClient(user.anthropicApiKey);
+        const client = getAnthropicClient(resolveApiKey(user.anthropicApiKey));
         const contextString = getContextString();
         const emailCount = tabMeta.count;
         const sequenceDescriptions: Record<SequenceType, string> = {
@@ -1482,12 +1482,12 @@ Write ${emailCount} emails. Make each email genuinely world-class — specific, 
                 >
                   <Sparkles className="w-4 h-4" />
                 </motion.div>
-                {user.anthropicApiKey ? 'Generating with Claude AI…' : `Generating ${tabMeta.label}…`}
+                {resolveApiKey(user.anthropicApiKey) ? 'Generating with Claude AI…' : `Generating ${tabMeta.label}…`}
               </>
             ) : (
               <>
-                {user.anthropicApiKey ? <Sparkles className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-                {user.anthropicApiKey ? `✨ Generate with AI — ${tabMeta.label}` : `Generate ${tabMeta.label} (${tabMeta.count} emails)`}
+                {resolveApiKey(user.anthropicApiKey) ? <Sparkles className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                {resolveApiKey(user.anthropicApiKey) ? `✨ Generate with AI — ${tabMeta.label}` : `Generate ${tabMeta.label} (${tabMeta.count} emails)`}
               </>
             )}
           </Button>

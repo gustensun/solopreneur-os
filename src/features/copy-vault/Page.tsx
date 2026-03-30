@@ -17,7 +17,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { getAnthropicClient } from '@/lib/ai';
+import { getAnthropicClient, resolveApiKey } from '@/lib/ai';
 import { useUserStore } from '@/stores/user';
 import { useContextStore } from '@/stores/context';
 import { useCopyVaultStore } from '@/stores/copyVault';
@@ -243,7 +243,7 @@ function TemplateCard({
 
   const handleVariations = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!user.anthropicApiKey) {
+    if (!resolveApiKey(user.anthropicApiKey)) {
       // Static fallback: generate simple variations
       const staticVariations = [
         template.text.replace(/\{(\w+)\}/g, '[Your $1]'),
@@ -257,7 +257,7 @@ function TemplateCard({
     setGeneratingVariations(true);
     const toastId = toast.loading('Generating AI variations…');
     try {
-      const client = getAnthropicClient(user.anthropicApiKey);
+      const client = getAnthropicClient(resolveApiKey(user.anthropicApiKey));
       const contextString = getContextString();
 
       const response = await client.messages.create({
@@ -434,7 +434,7 @@ function FillInPanel({
     setPolishedText('');
     const toastId = toast.loading('Polishing with Claude AI…');
     try {
-      const client = getAnthropicClient(user.anthropicApiKey);
+      const client = getAnthropicClient(resolveApiKey(user.anthropicApiKey));
       const contextString = getContextString();
       const response = await client.messages.create({
         model: 'claude-sonnet-4-5',

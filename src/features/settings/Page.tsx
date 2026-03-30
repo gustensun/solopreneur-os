@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useUserStore } from "@/stores/user";
+import { APP_API_KEY } from "@/lib/ai";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -228,7 +229,11 @@ export default function SettingsPage() {
             <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
               AI Configuration
             </h2>
-            {user.anthropicApiKey ? (
+            {APP_API_KEY ? (
+              <Badge className="bg-blue-500/15 text-blue-600 border-blue-500/30 hover:bg-blue-500/20">
+                ✦ App key active
+              </Badge>
+            ) : user.anthropicApiKey ? (
               <Badge className="bg-green-500/15 text-green-600 border-green-500/30 hover:bg-green-500/20">
                 Connected
               </Badge>
@@ -276,9 +281,15 @@ export default function SettingsPage() {
                   Current key: {getMaskedKey(user.anthropicApiKey)}
                 </p>
               )}
-              <p className="text-xs text-muted-foreground">
-                Your key is stored locally and never sent anywhere except the Anthropic API.
-              </p>
+              {APP_API_KEY ? (
+                <p className="text-xs text-blue-600/80">
+                  ✦ An app-level API key is active — AI features work for all users without a personal key.
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Your key is stored locally and never sent anywhere except the Anthropic API.
+                </p>
+              )}
             </div>
 
             <div className="flex items-center gap-3">

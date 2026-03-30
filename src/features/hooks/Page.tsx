@@ -21,7 +21,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { cn, generateId } from '@/lib/utils';
-import { getAnthropicClient } from '@/lib/ai';
+import { getAnthropicClient, resolveApiKey } from '@/lib/ai';
 import { useUserStore } from '@/stores/user';
 import { useContextStore } from '@/stores/context';
 import {
@@ -575,10 +575,10 @@ export default function HookGeneratorPage() {
 
     const opts: HookGenerationOptions = { contentType, topic, audience, emotions, framework, tone };
 
-    if (user.anthropicApiKey) {
+    if (resolveApiKey(user.anthropicApiKey)) {
       const toastId = toast.loading('Generating hooks with Claude AI…');
       try {
-        const client = getAnthropicClient(user.anthropicApiKey);
+        const client = getAnthropicClient(resolveApiKey(user.anthropicApiKey));
         const contextString = getContextString();
         const frameworkLabel = FRAMEWORKS.find((f) => f.value === framework)?.label ?? framework;
         const emotionLabel = emotions.map((e) => EMOTION_OPTIONS.find((o) => o.value === e)?.label ?? e).join(', ');

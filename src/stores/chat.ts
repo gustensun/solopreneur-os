@@ -4,7 +4,7 @@ import { generateId } from '@/lib/utils';
 import type { AIConversation, AIMessage, AttachedFile, AgentTool, AIModel } from '@/types';
 import { useContextStore } from '@/stores/context';
 import { useUserStore } from '@/stores/user';
-import { getAnthropicClient, resolveModelId } from '@/lib/ai';
+import { getAnthropicClient, resolveModelId, resolveApiKey } from '@/lib/ai';
 
 // Context-aware responses — keyed by keyword patterns in the user's message
 const CONTEXTUAL_RESPONSES: Array<{ keywords: string[]; response: (ctx: string) => string }> = [
@@ -179,7 +179,7 @@ export const useChatStore = create<ChatStore>()(
           ),
         }));
 
-        const apiKey = useUserStore.getState().user.anthropicApiKey;
+        const apiKey = resolveApiKey(useUserStore.getState().user.anthropicApiKey);
 
         if (apiKey) {
           // Real Anthropic streaming
@@ -325,7 +325,7 @@ export const useChatStore = create<ChatStore>()(
           isStreaming: true,
         }));
 
-        const apiKey = useUserStore.getState().user.anthropicApiKey;
+        const apiKey = resolveApiKey(useUserStore.getState().user.anthropicApiKey);
 
         if (apiKey) {
           const model = get().model;

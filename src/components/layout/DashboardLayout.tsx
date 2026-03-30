@@ -129,10 +129,13 @@ export function DashboardLayout({
   const user = useUserStore((s) => s.user);
 
   useEffect(() => {
-    if (!hasCompletedOnboarding && location.pathname !== "/onboarding") {
+    // Only redirect brand-new users (no name set yet). Existing users who
+    // already have data are considered onboarded even if the flag is unset.
+    const isNewUser = !hasCompletedOnboarding && !user.name;
+    if (isNewUser && location.pathname !== "/onboarding") {
       navigate("/onboarding", { replace: true });
     }
-  }, [hasCompletedOnboarding, location.pathname, navigate]);
+  }, [hasCompletedOnboarding, user.name, location.pathname, navigate]);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 

@@ -28,6 +28,13 @@ import {
   ChevronRight,
   ChevronDown,
   Leaf,
+  LayoutDashboard,
+  Search,
+  Image,
+  Zap,
+  AtSign,
+  Archive,
+  Layers,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -48,6 +55,7 @@ interface NavGroup {
 }
 
 const mainNav: NavItem[] = [
+  { label: "Dashboard", icon: LayoutDashboard, to: "/dashboard" },
   { label: "AI Chat", icon: MessageSquare, to: "/ai-chat" },
   { label: "AI Voice", icon: Phone, to: "/voice-call" },
   { label: "Calendar", icon: Calendar, to: "/calendar" },
@@ -57,6 +65,8 @@ const toolGroups: NavGroup[] = [
   {
     label: "Plan",
     items: [
+      { label: "Context Hub", icon: Layers, to: "/context-hub" },
+      { label: "Market Research", icon: Search, to: "/market-research" },
       { label: "Business Quiz", icon: ClipboardList, to: "/business-quiz" },
       { label: "Income Streams", icon: DollarSign, to: "/income-streams" },
       { label: "Niche Statement", icon: Target, to: "/niche-statement" },
@@ -76,6 +86,10 @@ const toolGroups: NavGroup[] = [
   {
     label: "Launch",
     items: [
+      { label: "Hook Generator", icon: Zap, to: "/hooks" },
+      { label: "Email Studio", icon: AtSign, to: "/email-studio" },
+      { label: "Copy Vault", icon: Archive, to: "/copy-vault" },
+      { label: "Image Studio", icon: Image, to: "/image-studio" },
       { label: "Sales Page Writer", icon: FileText, to: "/copy-writer" },
       { label: "Ad Writer", icon: Megaphone, to: "/ad-writer" },
       { label: "G Doc Magic", icon: FileSpreadsheet, to: "/gdoc-magic" },

@@ -2,23 +2,57 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { generateId } from '@/lib/utils';
 import type { AIConversation, AIMessage, AttachedFile, AgentTool, AIModel } from '@/types';
+import { useContextStore } from '@/stores/context';
 
-const MOCK_RESPONSES = [
-  "Great question! As a solopreneur, focusing on your core offer is the most important thing you can do. Start by identifying your ideal client's #1 pain point, then build a solution around that. The riches are in the niches — the more specific you get, the more you can charge.",
-  "When it comes to building an audience, consistency beats perfection every time. Show up daily with valuable content, share your journey, and document your wins and lessons. People buy from people they trust, and trust is built through repeated exposure over time.",
-  "Your personal brand is your most valuable asset. It's not just a logo or color palette — it's the unique combination of your story, skills, and perspective. Focus on what makes you different, not what makes you similar to everyone else in your space.",
-  "To scale your income without scaling your hours, think in systems. Create once, sell forever. A digital product, course, or membership that runs on automation can generate revenue while you sleep. Start with what you already know and package it.",
-  "The fastest way to grow your business is to talk to your customers. Schedule 5 customer interviews this week. Ask them what they struggle with most, what they've already tried, and what success looks like for them. That language becomes your marketing copy.",
-  "Pricing is psychology as much as it is math. Most solopreneurs underprice because of imposter syndrome. A higher price signals higher value. Test a 2x price increase on your next offer — you may convert the same or better, with clients who are more committed.",
-  "Content marketing compounds over time. A YouTube video you record today can bring in leads 3 years from now. Focus on search-intent content that answers the questions your ideal clients are already asking. One great piece of content beats 100 mediocre posts.",
-  "Your email list is your most valuable marketing asset — you own it. Social media algorithms change, platforms die, but your email list stays with you. Offer a compelling lead magnet and direct all social traffic to grow that list consistently.",
+// Context-aware responses — keyed by keyword patterns in the user's message
+const CONTEXTUAL_RESPONSES: Array<{ keywords: string[]; response: (ctx: string) => string }> = [
+  {
+    keywords: ['niche', 'market', 'audience', 'who', 'target'],
+    response: (ctx) => `Based on your business context, ${ctx.includes('I help') ? 'you\'ve already defined your niche — now it\'s about going deeper' : 'let\'s sharpen your niche positioning'}.\n\n**The Niche Domination Framework:**\n\n1. **Drill to the pain** — Don't say "I help entrepreneurs." Say "I help e-commerce founders who are stuck at $30k/mo and can't scale past one-person operations."\n\n2. **Own the mechanism** — Your unique method is your moat. What do you do that nobody else does the same way?\n\n3. **Validate with money** — The best niche validation is someone paying you. Before you overthink positioning, get 3 clients in the niche you're targeting.\n\n4. **The Riches in Niches test** — Google your niche + "coach" or "consultant." If you find 10+ people, there's proven demand. If you find none, you're either pioneering or there's no market.\n\nWhat specific aspect of your niche positioning feels most unclear right now?`,
+  },
+  {
+    keywords: ['offer', 'price', 'package', 'sell', 'product', 'course'],
+    response: (ctx) => `Let me give you the Offer Architecture framework that top solopreneurs use to create irresistible offers.\n\n**The $10k Offer Stack:**\n\n🎯 **Core Transformation** (what they really want)\n- Not "12 coaching calls" — but "go from side hustle to $10k/mo in 90 days"\n\n💎 **Value Stack** (perceived value > actual price)\n- Core offer: $X value\n- Bonus 1: removes obstacle #1\n- Bonus 2: removes obstacle #2  \n- Guarantee: removes final risk\n\n🔑 **Price Anchoring**\n- Compare to the cost of NOT solving this problem\n- "This saves you 12 months of figuring it out alone — what's that worth?"\n\n⚡ **The Hormozi Formula:** Make the dream outcome so specific, the timeline believable, the effort minimal, and the guarantee strong enough that saying no feels irrational.\n\nWhat's the core transformation your offer delivers? Let's build it out.`,
+  },
+  {
+    keywords: ['content', 'post', 'social', 'instagram', 'twitter', 'linkedin', 'video', 'youtube'],
+    response: () => `Here's the Content System that generates leads on autopilot:\n\n**The Content Pyramid:**\n\n📹 **Long-form Anchor** (1x/week)\nYouTube video, podcast, or blog post. This is your SEO asset — it compounds forever.\n\n📱 **Short-form Derivatives** (5-7x/week)\nClip, carousel, quote graphic from the long-form piece. Never create original short content — always repurpose.\n\n📧 **Email Summary** (2x/week)\nSend your best insights to your list. Email is the only channel with 100% reach.\n\n**The Hook Formula that works in 2026:**\n- Line 1: Bold claim or pattern interrupt\n- Line 2: The proof or the question\n- Line 3: What they'll get if they keep reading\n\n**What most people miss:** Don't create content to educate — create content to make people *feel* something. Emotion drives saves, shares, and sales.\n\nWhat platform are you going all-in on first?`,
+  },
+  {
+    keywords: ['revenue', 'income', 'money', 'scale', 'grow', '$', 'earn', 'sales'],
+    response: (ctx) => `${ctx.includes('$') ? 'You\'ve already got income flowing — now let\'s multiply it.' : 'Let\'s map out your path to consistent revenue.'}\n\n**The Solopreneur Revenue Stack:**\n\n**Floor Income** (pay the bills)\n- 1-3 premium clients at $2-5k/mo\n- This is your "never worry about money" base\n\n**Leverage Income** (scale without hours)\n- A digital product, course, or membership\n- Sells while you sleep, no extra time\n\n**Sky Income** (the multiplier)\n- Speaking, licensing, affiliate, or equity deals\n- One deal can be worth 12 months of client work\n\n**The 90-day path to $10k/mo:**\n1. Week 1-2: Define your premium offer and price it at $2k+\n2. Week 3-4: Reach out to 50 warm contacts\n3. Month 2: Close 3-5 clients at your premium price\n4. Month 3: Package what's working into a digital product\n\nYou don't need more followers. You need a clearer offer and the courage to ask for the sale.`,
+  },
+  {
+    keywords: ['brand', 'story', 'authority', 'credibility', 'trust', 'positioning'],
+    response: () => `Your personal brand is the #1 leverage point for a solopreneur. Here's how to build one that attracts premium clients:\n\n**The Authority Pyramid:**\n\n🏔️ **Peak: Point of View**\nA bold, specific stance that polarizes — you can't be remembered if you don't stand for something. What's your contrarian take on your industry?\n\n🎯 **Middle: Proof**\n- Personal results (your own transformation)\n- Client results (documented case studies)\n- Frameworks (proprietary systems with names)\n\n🌱 **Base: Consistency**\nShow up in the same place, with the same message, every week for 12 months. The solopreneurs who "blow up" aren't lucky — they just didn't quit.\n\n**The #1 Brand Mistake:** Trying to appeal to everyone. The more specific your message, the more powerfully it resonates with your ideal person — even if it repels everyone else.\n\nWhat's one bold perspective you have that most people in your industry would disagree with?`,
+  },
+  {
+    keywords: ['stuck', 'help', 'lost', 'overwhelmed', 'where', 'start', 'how', 'first'],
+    response: (ctx) => `I hear you. Let me give you the solopreneur clarity framework:\n\n**The Clarity Stack — do these in order:**\n\n1️⃣ **Who** — Define exactly who you serve. One sentence: "I help [specific person] who [specific problem]."\n\n2️⃣ **What** — Design ONE offer. Not a menu. One thing. Price it higher than feels comfortable.\n\n3️⃣ **Where** — Pick ONE platform to get clients from. Master it before adding another.\n\n4️⃣ **Proof** — Get 3 clients at any price and document their results. Nothing beats case studies.\n\n5️⃣ **Scale** — Once you can get clients reliably, then automate, productize, and delegate.\n\n**The truth:** Most solopreneurs fail because they skip step 1 and wonder why nothing works. Clarity precedes everything.\n\n${ctx.includes('Niche') ? 'I can see you\'ve started on your niche — keep going. The clearer it gets, the easier everything else becomes.' : 'Start with your niche statement. Everything else flows from that.'}\n\nWhat feels most unclear right now?`,
+  },
 ];
 
-const AI_RESPONSE_DELAY_MS = 30;
+const FALLBACK_RESPONSES = [
+  "That's a powerful question. Here's what I'd focus on: **specificity over scale**. Most solopreneurs try to grow faster when they should be going deeper. Deeper into their niche, their offer clarity, their relationship with existing clients. Depth creates authority. Authority creates price leverage. Price leverage creates freedom. What does 'going deeper' look like for your business right now?",
+  "The solopreneurs who build lasting businesses all have one thing in common: they stopped chasing tactics and started building systems. A system for getting clients. A system for delivering results. A system for creating content. When your business runs on systems, you get your time back AND your revenue becomes predictable. What's the one area of your business that feels most chaotic right now?",
+  "Here's something most business coaches won't tell you: **your mindset is your #1 business constraint**. Not your funnel, your audience size, or your offer. It's the story you tell yourself about what's possible. The solopreneurs doing $50k+ months aren't smarter than you. They just decided to stop playing small. What would you do differently if you genuinely believed $30k months were inevitable for you?",
+  "Let's talk about the most underrated skill in business: **asking for the sale**. Content gets people interested. Trust gets people close. But only a clear, confident ask closes the deal. Most solopreneurs are excellent at the first two and terrible at the third. Practice this: 'Based on everything we've talked about, I think you'd be a great fit. Should we get started?' Say it without flinching. The discomfort fades after the third time.",
+];
 
-function getMockResponse(): string {
-  return MOCK_RESPONSES[Math.floor(Math.random() * MOCK_RESPONSES.length)];
+function getMockResponse(userMessage: string): string {
+  const ctx = useContextStore.getState().getContextString();
+  const lower = userMessage.toLowerCase();
+
+  for (const { keywords, response } of CONTEXTUAL_RESPONSES) {
+    if (keywords.some((kw) => lower.includes(kw))) {
+      return response(ctx);
+    }
+  }
+
+  return FALLBACK_RESPONSES[Math.floor(Math.random() * FALLBACK_RESPONSES.length)];
 }
+
+const AI_RESPONSE_DELAY_MS = 30;
 
 interface ChatStore {
   conversations: AIConversation[];
@@ -143,8 +177,8 @@ export const useChatStore = create<ChatStore>()(
           ),
         }));
 
-        // Simulate streaming
-        const fullResponse = getMockResponse();
+        // Simulate streaming with context-aware response
+        const fullResponse = getMockResponse(content);
         let charIndex = 0;
 
         const interval = setInterval(() => {
@@ -193,7 +227,7 @@ export const useChatStore = create<ChatStore>()(
 
       regenerateMessage: (conversationId, messageId) => {
         const now = new Date().toISOString();
-        const fullResponse = getMockResponse();
+        const fullResponse = getMockResponse('regenerate');
         let charIndex = 0;
 
         set((state) => ({

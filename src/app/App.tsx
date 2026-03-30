@@ -45,6 +45,15 @@ const AssetsPage = lazy(() => import("@/features/settings/AssetsPage"));
 const SettingsPage = lazy(() => import("@/features/settings/Page"));
 const AdminPage = lazy(() => import("@/features/settings/AdminPage"));
 
+// New power features
+const DashboardPage = lazy(() => import("@/features/dashboard/Page"));
+const ContextHubPage = lazy(() => import("@/features/context/Page"));
+const MarketResearchPage = lazy(() => import("@/features/research/Page"));
+const ImageStudioPage = lazy(() => import("@/features/image-studio/Page"));
+const HookGeneratorPage = lazy(() => import("@/features/hooks/Page"));
+const EmailStudioPage = lazy(() => import("@/features/email-studio/Page"));
+const CopyVaultPage = lazy(() => import("@/features/copy-vault/Page"));
+
 function PageLoader() {
   return (
     <div className="flex items-center justify-center h-full min-h-[200px]">
@@ -323,6 +332,15 @@ export default function App() {
               />
             }
           />
+
+          {/* Power features */}
+          <Route path="/dashboard" element={<LayoutRoute element={<DashboardPage />} title="Dashboard" description="Your business command center" />} />
+          <Route path="/context-hub" element={<LayoutRoute element={<ContextHubPage />} title="Context Hub" description="Your AI business context layer" />} />
+          <Route path="/market-research" element={<LayoutRoute element={<MarketResearchPage />} title="Market Research" description="Deep market and competitor analysis" />} />
+          <Route path="/image-studio" element={<LayoutRoute element={<ImageStudioPage />} title="Image Studio" description="Generate ads and carousel images" />} />
+          <Route path="/hooks" element={<LayoutRoute element={<HookGeneratorPage />} title="Hook Generator" description="Viral hooks and headlines" />} />
+          <Route path="/email-studio" element={<LayoutRoute element={<EmailStudioPage />} title="Email Studio" description="Build email sequences that convert" />} />
+          <Route path="/copy-vault" element={<LayoutRoute element={<CopyVaultPage />} title="Copy Vault" description="Proven copy templates and frameworks" />} />
 
           {/* 404 */}
           <Route

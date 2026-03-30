@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUserStore } from "@/stores/user";
 import { useThemeStore } from "@/stores/theme";
+import { useAuthStore } from "@/stores/auth";
 import {
   Bell,
   Settings,
@@ -132,15 +133,21 @@ export function DashboardLayout({
   const hasCompletedOnboarding = useUserStore((s) => s.hasCompletedOnboarding);
   const user = useUserStore((s) => s.user);
   const { theme, toggleTheme } = useThemeStore();
+  const { session, loading: authLoading, initialized } = useAuthStore();
 
   useEffect(() => {
+    // Redirect to auth if not logged in (once auth is initialized)
+    if (initialized && !authLoading && !session) {
+      navigate("/auth", { replace: true });
+      return;
+    }
     // Only redirect brand-new users (no name set yet). Existing users who
     // already have data are considered onboarded even if the flag is unset.
     const isNewUser = !hasCompletedOnboarding && !user.name;
     if (isNewUser && location.pathname !== "/onboarding") {
       navigate("/onboarding", { replace: true });
     }
-  }, [hasCompletedOnboarding, user.name, location.pathname, navigate]);
+  }, [session, authLoading, initialized, hasCompletedOnboarding, user.name, location.pathname, navigate]);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
@@ -266,11 +273,12 @@ export function DashboardLayout({
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link to="/auth" className="flex items-center gap-2 cursor-pointer text-destructive focus:text-destructive">
-                    <LogOut className="w-4 h-4" />
-                    Sign Out
-                  </Link>
+                <DropdownMenuItem
+                  className="flex items-center gap-2 cursor-pointer text-destructive focus:text-destructive"
+                  onClick={() => useAuthStore.getState().signOut()}
+                >
+                  <LogOut className="w-4 h-4" />
+                  Sign Out
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

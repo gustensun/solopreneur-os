@@ -1,5 +1,6 @@
 import { Suspense, lazy, useEffect } from "react";
 import { useThemeStore, applyTheme } from "@/stores/theme";
+import { useAuthStore } from "@/stores/auth";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Toaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -90,6 +91,8 @@ export default function App() {
 
   useEffect(() => {
     applyTheme(theme);
+    // Initialize Supabase auth session listener
+    useAuthStore.getState().initialize();
   }, []); // Apply on initial mount
 
   return (

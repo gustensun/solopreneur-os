@@ -67,6 +67,7 @@ const routeLabels: Record<string, string> = {
   hooks: "Hook Generator",
   "email-studio": "Email Studio",
   "copy-vault": "Copy Vault",
+  slides: "Slides",
 };
 
 function Breadcrumb() {

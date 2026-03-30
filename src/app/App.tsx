@@ -56,6 +56,7 @@ const ImageStudioPage = lazy(() => import("@/features/image-studio/Page"));
 const HookGeneratorPage = lazy(() => import("@/features/hooks/Page"));
 const EmailStudioPage = lazy(() => import("@/features/email-studio/Page"));
 const CopyVaultPage = lazy(() => import("@/features/copy-vault/Page"));
+const SlidesPage = lazy(() => import("@/features/slides/Page"));
 
 function PageLoader() {
   return (
@@ -354,6 +355,7 @@ export default function App() {
           <Route path="/hooks" element={<LayoutRoute element={<HookGeneratorPage />} title="Hook Generator" description="Viral hooks and headlines" />} />
           <Route path="/email-studio" element={<LayoutRoute element={<EmailStudioPage />} title="Email Studio" description="Build email sequences that convert" />} />
           <Route path="/copy-vault" element={<LayoutRoute element={<CopyVaultPage />} title="Copy Vault" description="Proven copy templates and frameworks" />} />
+          <Route path="/slides" element={<LayoutRoute element={<SlidesPage />} title="Slides" description="AI-powered presentation builder" />} />
 
           {/* 404 */}
           <Route

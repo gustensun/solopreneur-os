@@ -10,10 +10,8 @@ import {
   Target,
   Users,
   Gift,
-  Layout,
   BookOpen,
   Fingerprint,
-  Code,
   FileText,
   Megaphone,
   FileSpreadsheet,
@@ -29,12 +27,9 @@ import {
   ChevronDown,
   Leaf,
   LayoutDashboard,
-  Search,
-  Image,
-  Zap,
-  AtSign,
-  Archive,
-  Layers,
+  Layout,
+  TrendingUp,
+  LayoutTemplate,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -54,58 +49,63 @@ interface NavGroup {
   items: NavItem[];
 }
 
+// ─── Top-level nav (always visible) ─────────────────────────────────────────
+
 const mainNav: NavItem[] = [
-  { label: "Dashboard", icon: LayoutDashboard, to: "/dashboard" },
-  { label: "AI Chat", icon: MessageSquare, to: "/ai-chat" },
-  { label: "AI Voice", icon: Phone, to: "/voice-call" },
-  { label: "Calendar", icon: Calendar, to: "/calendar" },
+  { label: "Dashboard",     icon: LayoutDashboard, to: "/dashboard" },
+  { label: "AI Chat",       icon: MessageSquare,   to: "/ai-chat" },
+  { label: "AI Voice",      icon: Phone,           to: "/voice-call" },
+  { label: "Business Quiz", icon: ClipboardList,   to: "/business-quiz" },
+  { label: "Calendar",      icon: Calendar,        to: "/calendar" },
 ];
+
+// ─── Collapsible tool groups ─────────────────────────────────────────────────
 
 const toolGroups: NavGroup[] = [
   {
     label: "Plan",
     items: [
-      { label: "Context Hub", icon: Layers, to: "/context-hub" },
-      { label: "Market Research", icon: Search, to: "/market-research" },
-      { label: "Business Quiz", icon: ClipboardList, to: "/business-quiz" },
-      { label: "Income Streams", icon: DollarSign, to: "/income-streams" },
-      { label: "Niche Statement", icon: Target, to: "/niche-statement" },
-      { label: "Avatar Architect", icon: Users, to: "/avatar-architect" },
-      { label: "Offer Creator", icon: Gift, to: "/offer-creator" },
+      { label: "Income Streams", icon: DollarSign,  to: "/income-streams" },
+      { label: "Niche",          icon: Target,      to: "/niche-statement" },
+      { label: "Avatar",         icon: Users,       to: "/avatar-architect" },
     ],
   },
   {
     label: "Build",
     items: [
-      { label: "Content", icon: Layout, to: "/projects" },
-      { label: "Program Builder", icon: BookOpen, to: "/program" },
-      { label: "Personal Brand", icon: Fingerprint, to: "/personal-brand" },
-      { label: "Vibe Coding", icon: Code, to: "/vibe-coding" },
+      { label: "Offer",       icon: Gift,      to: "/offer-creator" },
+      { label: "Sales Page",  icon: FileText,  to: "/copy-writer" },
+      { label: "Program",     icon: BookOpen,  to: "/program" },
     ],
   },
   {
     label: "Launch",
     items: [
-      { label: "Hook Generator", icon: Zap, to: "/hooks" },
-      { label: "Email Studio", icon: AtSign, to: "/email-studio" },
-      { label: "Copy Vault", icon: Archive, to: "/copy-vault" },
-      { label: "Image Studio", icon: Image, to: "/image-studio" },
-      { label: "Sales Page Writer", icon: FileText, to: "/copy-writer" },
-      { label: "Ad Writer", icon: Megaphone, to: "/ad-writer" },
-      { label: "G Doc Magic", icon: FileSpreadsheet, to: "/gdoc-magic" },
-      { label: "VSL Generator", icon: Video, to: "/vsl-generator" },
+      { label: "G Doc",   icon: FileSpreadsheet, to: "/gdoc-magic" },
+      { label: "Content", icon: Layout,          to: "/projects" },
+      { label: "VSL",     icon: Video,           to: "/vsl-generator" },
+    ],
+  },
+  {
+    label: "Scale",
+    items: [
+      { label: "Ad Writer",       icon: Megaphone,     to: "/ad-writer" },
+      { label: "Personal Brand",  icon: Fingerprint,   to: "/personal-brand" },
+      { label: "Slides",          icon: LayoutTemplate, to: "/slides" },
     ],
   },
 ];
 
 const workspaceNav: NavItem[] = [
-  { label: "Academy", icon: GraduationCap, to: "/academy" },
-  { label: "Clients", icon: UserCheck, to: "/clients" },
-  { label: "Messages", icon: Mail, to: "/messages" },
-  { label: "Brain", icon: Brain, to: "/brain" },
-  { label: "Skills", icon: Sparkles, to: "/skills" },
-  { label: "Assets", icon: FolderOpen, to: "/assets" },
+  { label: "Brain",    icon: Brain,          to: "/brain" },
+  { label: "Skills",   icon: Sparkles,       to: "/skills" },
+  { label: "Academy",  icon: GraduationCap,  to: "/academy" },
+  { label: "Messages", icon: Mail,           to: "/messages" },
+  { label: "Clients",  icon: UserCheck,      to: "/clients" },
+  { label: "Assets",   icon: FolderOpen,     to: "/assets" },
 ];
+
+// ─── NavLink ──────────────────────────────────────────────────────────────────
 
 function NavLink({
   item,
@@ -173,6 +173,8 @@ function NavLink({
   return linkContent;
 }
 
+// ─── CollapsibleGroup ─────────────────────────────────────────────────────────
+
 function CollapsibleGroup({
   group,
   collapsed: sidebarCollapsed,
@@ -182,14 +184,15 @@ function CollapsibleGroup({
   collapsed: boolean;
   location: string;
 }) {
-  const [open, setOpen] = useState(true);
+  // All groups closed by default
+  const [open, setOpen] = useState(false);
 
   return (
-    <div className="mb-1">
+    <div className="mb-0.5">
       {!sidebarCollapsed ? (
         <button
           onClick={() => setOpen((v) => !v)}
-          className="w-full flex items-center justify-between px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-[hsl(var(--sidebar-muted))] hover:text-[hsl(var(--sidebar-foreground))] transition-colors duration-200"
+          className="w-full flex items-center justify-between px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-[hsl(var(--sidebar-muted))] hover:text-[hsl(var(--sidebar-foreground))] transition-colors duration-200 rounded-md hover:bg-[hsl(var(--sidebar-accent))]/50"
         >
           {group.label}
           <ChevronDown
@@ -214,7 +217,7 @@ function CollapsibleGroup({
             transition={{ duration: 0.2, ease: "easeInOut" }}
             className="overflow-hidden"
           >
-            <div className="space-y-0.5">
+            <div className="space-y-0.5 pt-0.5">
               {group.items.map((item) => (
                 <NavLink
                   key={item.to}
@@ -231,9 +234,11 @@ function CollapsibleGroup({
   );
 }
 
+// ─── AppSidebar ───────────────────────────────────────────────────────────────
+
 export function AppSidebar() {
   const [collapsed, setCollapsed] = useState(false);
-  const [workspaceOpen, setWorkspaceOpen] = useState(true);
+  const [workspaceOpen, setWorkspaceOpen] = useState(false);
   const location = useLocation();
 
   return (
@@ -271,13 +276,9 @@ export function AppSidebar() {
       </div>
 
       {/* Scrollable nav */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden py-3 px-2 space-y-1 scrollbar-thin">
-        {/* Main */}
-        {!collapsed && (
-          <p className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-[hsl(var(--sidebar-muted))]">
-            Main
-          </p>
-        )}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden py-3 px-2 space-y-0.5 scrollbar-thin">
+
+        {/* Main nav — always visible */}
         <div className="space-y-0.5 mb-3">
           {mainNav.map((item) => (
             <NavLink
@@ -289,15 +290,13 @@ export function AppSidebar() {
           ))}
         </div>
 
-        {/* Divider */}
+        {/* Divider before tool groups */}
         {!collapsed && (
-          <p className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-[hsl(var(--sidebar-muted))]">
-            Tools
-          </p>
+          <div className="h-px bg-[hsl(var(--sidebar-border))] mx-3 mb-2" />
         )}
 
         {/* Tool groups */}
-        <div className="space-y-1">
+        <div className="space-y-0.5">
           {toolGroups.map((group) => (
             <CollapsibleGroup
               key={group.label}
@@ -308,14 +307,22 @@ export function AppSidebar() {
           ))}
         </div>
 
-        {/* Workspace */}
-        <div className="mt-2">
+        {/* Divider before workspace */}
+        {!collapsed && (
+          <div className="h-px bg-[hsl(var(--sidebar-border))] mx-3 mt-2 mb-1" />
+        )}
+
+        {/* Workspace group */}
+        <div className="mt-1">
           {!collapsed ? (
             <button
               onClick={() => setWorkspaceOpen((v) => !v)}
-              className="w-full flex items-center justify-between px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-[hsl(var(--sidebar-muted))] hover:text-[hsl(var(--sidebar-foreground))] transition-colors duration-200"
+              className="w-full flex items-center justify-between px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-[hsl(var(--sidebar-muted))] hover:text-[hsl(var(--sidebar-foreground))] transition-colors duration-200 rounded-md hover:bg-[hsl(var(--sidebar-accent))]/50"
             >
-              Workspace
+              <span className="flex items-center gap-1.5">
+                <TrendingUp className="w-3 h-3" />
+                Workspace
+              </span>
               <ChevronDown
                 className={cn(
                   "w-3 h-3 transition-transform duration-200",
@@ -338,7 +345,7 @@ export function AppSidebar() {
                 transition={{ duration: 0.2, ease: "easeInOut" }}
                 className="overflow-hidden"
               >
-                <div className="space-y-0.5">
+                <div className="space-y-0.5 pt-0.5">
                   {workspaceNav.map((item) => (
                     <NavLink
                       key={item.to}
@@ -357,10 +364,7 @@ export function AppSidebar() {
       {/* Collapse toggle */}
       <button
         onClick={() => setCollapsed((v) => !v)}
-        className={cn(
-          "flex items-center justify-center h-12 border-t border-[hsl(var(--sidebar-border))] text-[hsl(var(--sidebar-muted))] hover:text-[hsl(var(--sidebar-foreground))] hover:bg-[hsl(var(--sidebar-accent))] transition-all duration-200 shrink-0",
-          collapsed ? "w-full" : "w-full"
-        )}
+        className="flex items-center justify-center h-12 border-t border-[hsl(var(--sidebar-border))] text-[hsl(var(--sidebar-muted))] hover:text-[hsl(var(--sidebar-foreground))] hover:bg-[hsl(var(--sidebar-accent))] transition-all duration-200 shrink-0 w-full"
         aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
       >
         {collapsed ? (

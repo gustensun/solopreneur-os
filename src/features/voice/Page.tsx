@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Phone, PhoneOff, Mic, MicOff, Volume2, ChevronDown, Bot } from "lucide-react";
+import { ConversationProvider, useConversation } from "@elevenlabs/react";
+import type { MessagePayload } from "@elevenlabs/types";
+import { Phone, PhoneOff, Mic, MicOff, Volume2, ChevronDown, Bot, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -9,22 +11,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useUserStore } from "@/stores/user";
+import { generateId } from "@/lib/utils";
 
-// ─── Mock data ─────────────────────────────────────────────────────────────────
+// ─── Constants ─────────────────────────────────────────────────────────────────
 
-const MOCK_MICROPHONES = [
-  "MacBook Pro Microphone",
-  "AirPods Pro",
-  "Blue Yeti USB Mic",
-  "Logitech HD Webcam",
-];
+const AGENT_ID = "agent_3401kmzjycgaerm9an18fx8fsvan";
 
-const MOCK_SPEAKERS = [
-  "MacBook Pro Speakers",
-  "AirPods Pro",
-  "Sony WH-1000XM5",
-  "External Monitor Audio",
-];
+// ─── Types ─────────────────────────────────────────────────────────────────────
 
 interface TranscriptLine {
   id: string;
@@ -33,110 +26,62 @@ interface TranscriptLine {
   time: string;
 }
 
-const MOCK_TRANSCRIPT: TranscriptLine[] = [
-  {
-    id: "1",
-    role: "assistant",
-    text: "Hey! Welcome to your AI coaching session. I'm here to help you build your solopreneur business. What would you like to work on today?",
-    time: "0:02",
-  },
-  {
-    id: "2",
-    role: "user",
-    text: "I want to figure out my niche. I've been trying to pick between the health and wealth markets.",
-    time: "0:15",
-  },
-  {
-    id: "3",
-    role: "assistant",
-    text: "Great question! Both are strong markets, but the key is to pick the one that aligns with your own story and credibility. Have you had personal results in either area that you could speak to authentically?",
-    time: "0:28",
-  },
-  {
-    id: "4",
-    role: "user",
-    text: "Yes — I spent 3 years building an online business from scratch and hit six figures. So probably the wealth market.",
-    time: "0:45",
-  },
-  {
-    id: "5",
-    role: "assistant",
-    text: "Perfect. Your story is your authority. Now let's get specific — within the wealth market, the richest niches are those with a specific transformation. Think: 'I help [specific group] achieve [specific result] in [specific timeframe] without [specific pain].'",
-    time: "1:02",
-  },
-];
-
-// ─── Voice Orb ────────────────────────────────────────────────────────────────
-
-interface VoiceOrbProps {
-  isActive: boolean;
-  isSpeaking: boolean;
+interface AudioDevice {
+  deviceId: string;
+  label: string;
 }
 
-function VoiceOrb({ isActive, isSpeaking }: VoiceOrbProps) {
+// ─── Helpers ───────────────────────────────────────────────────────────────────
+
+function formatDuration(secs: number) {
+  const m = Math.floor(secs / 60).toString().padStart(2, "0");
+  const s = (secs % 60).toString().padStart(2, "0");
+  return `${m}:${s}`;
+}
+
+function formatTime(secs: number) {
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+// ─── Voice Orb ─────────────────────────────────────────────────────────────────
+
+function VoiceOrb({ isActive, isSpeaking }: { isActive: boolean; isSpeaking: boolean }) {
   return (
     <div className="relative flex items-center justify-center w-52 h-52">
-      {/* Outermost pulse ring — only when active */}
       {isActive && (
         <>
           <motion.div
             className="absolute inset-0 rounded-full"
-            style={{
-              background: "radial-gradient(circle, hsl(155 35% 45% / 0.08) 0%, transparent 70%)",
-            }}
+            style={{ background: "radial-gradient(circle, hsl(155 35% 45% / 0.08) 0%, transparent 70%)" }}
             animate={{ scale: [1, 1.55, 1], opacity: [0.6, 0, 0.6] }}
             transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
           />
           <motion.div
             className="absolute inset-0 rounded-full"
-            style={{
-              background: "radial-gradient(circle, hsl(155 35% 45% / 0.12) 0%, transparent 65%)",
-            }}
+            style={{ background: "radial-gradient(circle, hsl(155 35% 45% / 0.12) 0%, transparent 65%)" }}
             animate={{ scale: [1, 1.35, 1], opacity: [0.7, 0.1, 0.7] }}
             transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
           />
         </>
       )}
 
-      {/* Speaking rings */}
-      {isSpeaking && isActive && (
-        <>
-          {[1, 2, 3].map((i) => (
-            <motion.div
-              key={i}
-              className="absolute rounded-full border border-[hsl(var(--sidebar-primary))]/30"
-              style={{ inset: -i * 14 }}
-              animate={{ scale: [0.9, 1.1, 0.9], opacity: [0.5, 0.15, 0.5] }}
-              transition={{
-                duration: 1.2,
-                repeat: Infinity,
-                ease: "easeInOut",
-                delay: i * 0.18,
-              }}
-            />
-          ))}
-        </>
-      )}
+      {isSpeaking && isActive && [1, 2, 3].map((i) => (
+        <motion.div
+          key={i}
+          className="absolute rounded-full border border-[hsl(var(--sidebar-primary))]/30"
+          style={{ inset: -i * 14 }}
+          animate={{ scale: [0.9, 1.1, 0.9], opacity: [0.5, 0.15, 0.5] }}
+          transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut", delay: i * 0.18 }}
+        />
+      ))}
 
-      {/* Core orb */}
       <motion.div
         className="relative w-36 h-36 rounded-full overflow-hidden shadow-2xl"
-        animate={
-          isActive
-            ? isSpeaking
-              ? { scale: [1, 1.07, 0.96, 1.04, 1] }
-              : { scale: [1, 1.03, 1] }
-            : { scale: 1 }
-        }
-        transition={
-          isActive
-            ? isSpeaking
-              ? { duration: 0.8, repeat: Infinity, ease: "easeInOut" }
-              : { duration: 3.5, repeat: Infinity, ease: "easeInOut" }
-            : {}
-        }
+        animate={isActive ? (isSpeaking ? { scale: [1, 1.07, 0.96, 1.04, 1] } : { scale: [1, 1.03, 1] }) : { scale: 1 }}
+        transition={isActive ? (isSpeaking ? { duration: 0.8, repeat: Infinity, ease: "easeInOut" } : { duration: 3.5, repeat: Infinity, ease: "easeInOut" }) : {}}
       >
-        {/* Gradient sphere */}
         <motion.div
           className="absolute inset-0"
           style={{
@@ -147,29 +92,18 @@ function VoiceOrb({ isActive, isSpeaking }: VoiceOrbProps) {
           animate={isActive ? { rotate: [0, 360] } : { rotate: 0 }}
           transition={isActive ? { duration: 8, repeat: Infinity, ease: "linear" } : {}}
         />
-
-        {/* Shimmer highlight */}
         <motion.div
           className="absolute inset-0 rounded-full"
-          style={{
-            background:
-              "radial-gradient(ellipse 60% 45% at 35% 30%, rgba(255,255,255,0.18) 0%, transparent 70%)",
-          }}
+          style={{ background: "radial-gradient(ellipse 60% 45% at 35% 30%, rgba(255,255,255,0.18) 0%, transparent 70%)" }}
           animate={isActive ? { opacity: [0.6, 1, 0.6] } : { opacity: 0.4 }}
           transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
         />
-
-        {/* Center icon */}
         <div className="absolute inset-0 flex items-center justify-center">
           <motion.div
             animate={isActive ? { scale: [1, 1.08, 1] } : { scale: 1 }}
             transition={{ duration: 2.5, repeat: isActive ? Infinity : 0, ease: "easeInOut" }}
           >
-            {isActive ? (
-              <Bot className="w-10 h-10 text-white/90 drop-shadow-lg" />
-            ) : (
-              <Bot className="w-10 h-10 text-white/40" />
-            )}
+            <Bot className={cn("w-10 h-10 drop-shadow-lg", isActive ? "text-white/90" : "text-white/40")} />
           </motion.div>
         </div>
       </motion.div>
@@ -177,20 +111,15 @@ function VoiceOrb({ isActive, isSpeaking }: VoiceOrbProps) {
   );
 }
 
-// ─── Transcript Panel ─────────────────────────────────────────────────────────
+// ─── Transcript Panel ──────────────────────────────────────────────────────────
 
-interface TranscriptPanelProps {
+function TranscriptPanel({ lines, isSpeaking, userInitials }: {
   lines: TranscriptLine[];
-  isStreaming: boolean;
+  isSpeaking: boolean;
   userInitials: string;
-}
-
-function TranscriptPanel({ lines, isStreaming, userInitials }: TranscriptPanelProps) {
+}) {
   const bottomRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [lines.length]);
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [lines.length]);
 
   return (
     <div className="flex flex-col h-full">
@@ -205,13 +134,9 @@ function TranscriptPanel({ lines, isStreaming, userInitials }: TranscriptPanelPr
               key={line.id}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, ease: "easeOut" }}
-              className={cn(
-                "flex gap-3",
-                line.role === "user" ? "flex-row-reverse" : "flex-row"
-              )}
+              transition={{ duration: 0.3 }}
+              className={cn("flex gap-3", line.role === "user" ? "flex-row-reverse" : "flex-row")}
             >
-              {/* Avatar */}
               <div className={cn(
                 "w-6 h-6 rounded-full shrink-0 flex items-center justify-center text-[10px] font-bold mt-0.5",
                 line.role === "user"
@@ -220,8 +145,6 @@ function TranscriptPanel({ lines, isStreaming, userInitials }: TranscriptPanelPr
               )}>
                 {line.role === "user" ? userInitials.slice(0, 1) : <Bot className="w-3 h-3" />}
               </div>
-
-              {/* Bubble */}
               <div className={cn(
                 "max-w-[80%] rounded-xl px-3 py-2",
                 line.role === "user"
@@ -235,13 +158,8 @@ function TranscriptPanel({ lines, isStreaming, userInitials }: TranscriptPanelPr
           ))}
         </AnimatePresence>
 
-        {/* Streaming indicator */}
-        {isStreaming && (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex gap-3"
-          >
+        {isSpeaking && (
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex gap-3">
             <div className="w-6 h-6 rounded-full bg-[hsl(var(--sidebar-accent))] flex items-center justify-center shrink-0">
               <Bot className="w-3 h-3 text-[hsl(var(--sidebar-foreground))]/70" />
             </div>
@@ -265,82 +183,111 @@ function TranscriptPanel({ lines, isStreaming, userInitials }: TranscriptPanelPr
   );
 }
 
-// ─── Main Page ─────────────────────────────────────────────────────────────────
+// ─── Inner component (must be inside ConversationProvider) ─────────────────────
 
-export default function VoiceCallPage() {
+function VoiceCallInner() {
   const { user } = useUserStore();
+  const conversation = useConversation();
 
-  const [isConnected, setIsConnected] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
-  const [isConnecting, setIsConnecting] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
   const [transcriptLines, setTranscriptLines] = useState<TranscriptLine[]>([]);
-  const [isAISpeaking, setIsAISpeaking] = useState(false);
-  const [selectedMic, setSelectedMic] = useState(MOCK_MICROPHONES[0]);
-  const [selectedSpeaker, setSelectedSpeaker] = useState(MOCK_SPEAKERS[0]);
+  const [micDevices, setMicDevices] = useState<AudioDevice[]>([]);
+  const [speakerDevices, setSpeakerDevices] = useState<AudioDevice[]>([]);
+  const [selectedMicId, setSelectedMicId] = useState<string>("");
+  const [selectedSpeakerId, setSelectedSpeakerId] = useState<string>("");
+  const [permissionError, setPermissionError] = useState<string | null>(null);
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const transcriptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const durationRef = useRef(0);
 
-  // Call duration timer
+  const isConnected = conversation.status === "connected";
+  const isConnecting = conversation.status === "connecting";
+
+  // Enumerate audio devices
+  useEffect(() => {
+    async function loadDevices() {
+      try {
+        await navigator.mediaDevices.getUserMedia({ audio: true });
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const mics = devices.filter((d) => d.kind === "audioinput").map((d) => ({
+          deviceId: d.deviceId,
+          label: d.label || `Microphone ${d.deviceId.slice(0, 4)}`,
+        }));
+        const speakers = devices.filter((d) => d.kind === "audiooutput").map((d) => ({
+          deviceId: d.deviceId,
+          label: d.label || `Speaker ${d.deviceId.slice(0, 4)}`,
+        }));
+        setMicDevices(mics);
+        setSpeakerDevices(speakers);
+        if (mics[0]) setSelectedMicId(mics[0].deviceId);
+        if (speakers[0]) setSelectedSpeakerId(speakers[0].deviceId);
+      } catch {
+        // Silently fail — devices populated after permission granted on call start
+      }
+    }
+    loadDevices();
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, []);
+
+  // Timer
   useEffect(() => {
     if (isConnected) {
-      timerRef.current = setInterval(() => setCallDuration((d) => d + 1), 1000);
+      durationRef.current = 0;
+      timerRef.current = setInterval(() => {
+        durationRef.current += 1;
+        setCallDuration(durationRef.current);
+      }, 1000);
     } else {
       if (timerRef.current) clearInterval(timerRef.current);
+      durationRef.current = 0;
       setCallDuration(0);
     }
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [isConnected]);
 
-  // Mock transcript streaming after connection
-  useEffect(() => {
-    if (!isConnected) {
-      setTranscriptLines([]);
-      setIsAISpeaking(false);
-      return;
+  // Call handlers
+  async function handleConnect() {
+    setPermissionError(null);
+    try {
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+      conversation.startSession({
+        agentId: AGENT_ID,
+        connectionType: "webrtc",
+        onMessage: (msg: MessagePayload) => {
+          setTranscriptLines((prev) => [
+            ...prev,
+            {
+              id: generateId(),
+              role: msg.role === "user" ? "user" : "assistant",
+              text: msg.message,
+              time: formatTime(durationRef.current),
+            },
+          ]);
+        },
+        onError: (message: string) => {
+          setPermissionError(message);
+        },
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Microphone permission denied";
+      setPermissionError(msg);
     }
-
-    // Stream in mock transcript lines with delays
-    MOCK_TRANSCRIPT.forEach((line, i) => {
-      const delay = 1200 + i * 3200;
-      const t = setTimeout(() => {
-        setIsAISpeaking(line.role === "assistant");
-        setTranscriptLines((prev) => [...prev, line]);
-        // Turn off speaking indicator after 2s
-        setTimeout(() => setIsAISpeaking(false), 2000);
-      }, delay);
-      // Store last timeout for cleanup
-      if (i === MOCK_TRANSCRIPT.length - 1) transcriptTimerRef.current = t;
-    });
-
-    return () => {
-      if (transcriptTimerRef.current) clearTimeout(transcriptTimerRef.current);
-    };
-  }, [isConnected]);
-
-  function formatDuration(secs: number) {
-    const m = Math.floor(secs / 60).toString().padStart(2, "0");
-    const s = (secs % 60).toString().padStart(2, "0");
-    return `${m}:${s}`;
-  }
-
-  function handleConnect() {
-    if (isConnected) return;
-    setIsConnecting(true);
-    setTimeout(() => {
-      setIsConnecting(false);
-      setIsConnected(true);
-    }, 1800);
   }
 
   function handleDisconnect() {
-    setIsConnected(false);
-    setIsConnecting(false);
-    setIsMuted(false);
-    setIsAISpeaking(false);
+    conversation.endSession();
     setTranscriptLines([]);
+    setIsMuted(false);
   }
+
+  function handleMuteToggle() {
+    conversation.setVolume({ volume: isMuted ? 1 : 0 });
+    setIsMuted((v) => !v);
+  }
+
+  const selectedMicLabel = micDevices.find((d) => d.deviceId === selectedMicId)?.label ?? "Default Microphone";
+  const selectedSpeakerLabel = speakerDevices.find((d) => d.deviceId === selectedSpeakerId)?.label ?? "Default Speaker";
 
   return (
     <div className="flex h-full overflow-hidden">
@@ -348,128 +295,94 @@ export default function VoiceCallPage() {
       <div
         className="flex-1 flex flex-col items-center justify-between py-10 px-6 relative overflow-hidden"
         style={{
-          background:
-            "radial-gradient(ellipse 80% 70% at 50% 40%, hsl(160 35% 11%) 0%, hsl(160 45% 6%) 60%, hsl(160 40% 4%) 100%)",
+          background: "radial-gradient(ellipse 80% 70% at 50% 40%, hsl(160 35% 11%) 0%, hsl(160 45% 6%) 60%, hsl(160 40% 4%) 100%)",
         }}
       >
-        {/* Ambient background glow */}
+        {/* Ambient glow */}
         <motion.div
           className="absolute inset-0 pointer-events-none"
-          style={{
-            background:
-              "radial-gradient(ellipse 60% 50% at 50% 50%, hsl(155 35% 20% / 0.25) 0%, transparent 70%)",
-          }}
+          style={{ background: "radial-gradient(ellipse 60% 50% at 50% 50%, hsl(155 35% 20% / 0.25) 0%, transparent 70%)" }}
           animate={isConnected ? { opacity: [0.5, 1, 0.5] } : { opacity: 0.3 }}
           transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
         />
 
-        {/* Top status */}
+        {/* Error banner */}
+        <AnimatePresence>
+          {permissionError && (
+            <motion.div
+              initial={{ opacity: 0, y: -12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              className="absolute top-4 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-red-500/20 border border-red-500/40 text-red-300 text-xs rounded-full px-4 py-2 backdrop-blur-sm z-20 max-w-sm"
+            >
+              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+              {permissionError}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Status pill */}
         <div className="w-full max-w-sm flex items-center justify-center">
           <AnimatePresence mode="wait">
             {isConnected ? (
-              <motion.div
-                key="connected"
-                initial={{ opacity: 0, y: -8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-4 py-2 backdrop-blur-sm"
-              >
+              <motion.div key="connected" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+                className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-4 py-2 backdrop-blur-sm">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="text-sm font-medium text-white/90">
-                  Connected · {formatDuration(callDuration)}
-                </span>
+                <span className="text-sm font-medium text-white/90">Connected · {formatDuration(callDuration)}</span>
               </motion.div>
             ) : isConnecting ? (
-              <motion.div
-                key="connecting"
-                initial={{ opacity: 0, y: -8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-4 py-2 backdrop-blur-sm"
-              >
-                <motion.span
-                  className="w-2 h-2 rounded-full bg-amber-400"
-                  animate={{ opacity: [1, 0.3, 1] }}
-                  transition={{ duration: 0.8, repeat: Infinity }}
-                />
-                <span className="text-sm font-medium text-white/90">Connecting...</span>
+              <motion.div key="connecting" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+                className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-4 py-2 backdrop-blur-sm">
+                <motion.span className="w-2 h-2 rounded-full bg-amber-400" animate={{ opacity: [1, 0.3, 1] }} transition={{ duration: 0.8, repeat: Infinity }} />
+                <span className="text-sm font-medium text-white/90">Connecting…</span>
               </motion.div>
             ) : (
-              <motion.div
-                key="idle"
-                initial={{ opacity: 0, y: -8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                className="flex items-center gap-2"
-              >
+              <motion.div key="idle" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
                 <span className="text-sm text-white/40">AI Voice Coach</span>
               </motion.div>
             )}
           </AnimatePresence>
         </div>
 
-        {/* Central section — orb + label */}
+        {/* Orb + label + controls */}
         <div className="flex flex-col items-center gap-8 relative z-10">
-          {/* Orb */}
-          <VoiceOrb isActive={isConnected} isSpeaking={isAISpeaking} />
+          <VoiceOrb isActive={isConnected} isSpeaking={conversation.isSpeaking} />
 
-          {/* Label */}
           <div className="text-center">
             <AnimatePresence mode="wait">
               {isConnected ? (
-                <motion.div
-                  key="ai-name"
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                  transition={{ duration: 0.3 }}
-                >
+                <motion.div key="active" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.3 }}>
                   <p className="text-lg font-semibold text-white/90">AI Coach</p>
                   <motion.p
                     className="text-sm text-white/50 mt-0.5 h-5"
-                    key={isAISpeaking ? "speaking" : "listening"}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ duration: 0.3 }}
+                    key={conversation.isSpeaking ? "speaking" : isMuted ? "muted" : "listening"}
+                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}
                   >
-                    {isAISpeaking ? "Speaking..." : isMuted ? "You are muted" : "Listening..."}
+                    {conversation.isSpeaking ? "Speaking…" : isMuted ? "You are muted" : "Listening…"}
                   </motion.p>
                 </motion.div>
               ) : !isConnecting ? (
-                <motion.div
-                  key="idle-label"
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                  transition={{ duration: 0.3 }}
-                >
+                <motion.div key="idle" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.3 }}>
                   <p className="text-lg font-semibold text-white/70">AI Voice Coach</p>
-                  <p className="text-sm text-white/35 mt-1">Click to start your voice session</p>
+                  <p className="text-sm text-white/35 mt-1">Click to start your coaching session</p>
                 </motion.div>
               ) : null}
             </AnimatePresence>
           </div>
 
-          {/* Call controls */}
+          {/* Controls */}
           <div className="flex items-center gap-4">
-            {/* Mute button — only when connected */}
             <AnimatePresence>
               {isConnected && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  transition={{ duration: 0.2 }}
-                >
+                <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} transition={{ duration: 0.2 }}>
                   <button
-                    onClick={() => setIsMuted((v) => !v)}
+                    onClick={handleMuteToggle}
                     className={cn(
                       "w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 border",
                       isMuted
                         ? "bg-red-500/20 border-red-500/40 text-red-400 hover:bg-red-500/30"
                         : "bg-white/10 border-white/15 text-white/70 hover:bg-white/15 hover:text-white"
                     )}
-                    title={isMuted ? "Unmute" : "Mute"}
                   >
                     {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
                   </button>
@@ -477,7 +390,6 @@ export default function VoiceCallPage() {
               )}
             </AnimatePresence>
 
-            {/* Main call button */}
             <motion.button
               onClick={isConnected ? handleDisconnect : handleConnect}
               disabled={isConnecting}
@@ -505,62 +417,59 @@ export default function VoiceCallPage() {
               </AnimatePresence>
             </motion.button>
 
-            {/* Spacer to balance layout */}
             {isConnected && <div className="w-14 h-14" />}
           </div>
         </div>
 
-        {/* Bottom — Audio device selectors */}
+        {/* Audio device selectors */}
         <div className="w-full max-w-sm flex items-center justify-center gap-3 z-10">
-          {/* Microphone */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-xl px-3.5 py-2.5 text-xs text-white/60 hover:text-white/80 transition-all duration-200">
                 <Mic className="w-3.5 h-3.5 shrink-0" />
-                <span className="truncate max-w-[120px]">{selectedMic}</span>
+                <span className="truncate max-w-[120px]">{selectedMicLabel}</span>
                 <ChevronDown className="w-3 h-3 shrink-0 opacity-50" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-56">
-              {MOCK_MICROPHONES.map((mic) => (
-                <DropdownMenuItem
-                  key={mic}
-                  onClick={() => setSelectedMic(mic)}
-                  className={cn(selectedMic === mic && "bg-muted font-medium")}
-                >
-                  <Mic className="w-3.5 h-3.5 mr-2 opacity-60" />
-                  {mic}
+            <DropdownMenuContent align="start" className="w-60">
+              {micDevices.length > 0 ? micDevices.map((d) => (
+                <DropdownMenuItem key={d.deviceId} onClick={() => setSelectedMicId(d.deviceId)}
+                  className={cn(selectedMicId === d.deviceId && "bg-muted font-medium")}>
+                  <Mic className="w-3.5 h-3.5 mr-2 opacity-60" />{d.label}
                 </DropdownMenuItem>
-              ))}
+              )) : (
+                <DropdownMenuItem disabled className="text-xs text-muted-foreground">
+                  Grant mic permission to see devices
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Speaker */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-xl px-3.5 py-2.5 text-xs text-white/60 hover:text-white/80 transition-all duration-200">
                 <Volume2 className="w-3.5 h-3.5 shrink-0" />
-                <span className="truncate max-w-[120px]">{selectedSpeaker}</span>
+                <span className="truncate max-w-[120px]">{selectedSpeakerLabel}</span>
                 <ChevronDown className="w-3 h-3 shrink-0 opacity-50" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              {MOCK_SPEAKERS.map((speaker) => (
-                <DropdownMenuItem
-                  key={speaker}
-                  onClick={() => setSelectedSpeaker(speaker)}
-                  className={cn(selectedSpeaker === speaker && "bg-muted font-medium")}
-                >
-                  <Volume2 className="w-3.5 h-3.5 mr-2 opacity-60" />
-                  {speaker}
+            <DropdownMenuContent align="end" className="w-60">
+              {speakerDevices.length > 0 ? speakerDevices.map((d) => (
+                <DropdownMenuItem key={d.deviceId} onClick={() => setSelectedSpeakerId(d.deviceId)}
+                  className={cn(selectedSpeakerId === d.deviceId && "bg-muted font-medium")}>
+                  <Volume2 className="w-3.5 h-3.5 mr-2 opacity-60" />{d.label}
                 </DropdownMenuItem>
-              ))}
+              )) : (
+                <DropdownMenuItem disabled className="text-xs text-muted-foreground">
+                  Grant mic permission to see devices
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </div>
 
-      {/* Transcript panel — desktop only */}
+      {/* Transcript panel */}
       <AnimatePresence>
         {isConnected && (
           <motion.aside
@@ -572,15 +481,21 @@ export default function VoiceCallPage() {
             style={{ minWidth: 0 }}
           >
             <div className="w-[340px] h-full">
-              <TranscriptPanel
-                lines={transcriptLines}
-                isStreaming={isAISpeaking}
-                userInitials={user.initials}
-              />
+              <TranscriptPanel lines={transcriptLines} isSpeaking={conversation.isSpeaking} userInitials={user.initials} />
             </div>
           </motion.aside>
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+// ─── Page export (wraps inner with ConversationProvider) ───────────────────────
+
+export default function VoiceCallPage() {
+  return (
+    <ConversationProvider>
+      <VoiceCallInner />
+    </ConversationProvider>
   );
 }

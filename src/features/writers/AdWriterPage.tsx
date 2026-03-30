@@ -14,6 +14,9 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { getAnthropicClient, resolveApiKey } from "@/lib/ai";
+import { useContextStore } from "@/stores/context";
+import { useUserStore } from "@/stores/user";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -155,13 +158,98 @@ export default function AdWriterPage() {
   const [activeTab, setActiveTab] = useState(0);
   const [copied, setCopied] = useState<string | null>(null);
 
+  const getContextString = useContextStore((s) => s.getContextString);
+  const userApiKey = useUserStore((s) => s.user.anthropicApiKey);
+
   async function handleGenerate() {
     setIsGenerating(true);
     setVariations(null);
     setActiveTab(0);
-    await new Promise((r) => setTimeout(r, 550));
-    setVariations(generateAdVariations({ product, audience, tone, platform, benefit, ctaText }));
-    setIsGenerating(false);
+
+    const apiKey = resolveApiKey(userApiKey);
+
+    if (!apiKey) {
+      // Fallback to mock
+      await new Promise((r) => setTimeout(r, 550));
+      setVariations(generateAdVariations({ product, audience, tone, platform, benefit, ctaText }));
+      setIsGenerating(false);
+      return;
+    }
+
+    try {
+      const businessContext = getContextString();
+      const client = getAnthropicClient(apiKey);
+
+      const prompt = `You are an expert direct-response copywriter. Generate 3 high-converting ad variations.
+
+${businessContext}
+
+## Ad Brief
+- Product/Service: ${product || "AI Business Accelerator"}
+- Target Audience: ${audience || "entrepreneurs"}
+- Key Benefit: ${benefit || "grow your income with AI-powered systems"}
+- Call to Action: ${ctaText || "Get Started Today"}
+- Platform: ${platform}
+- Tone: ${tone}
+
+## Platform Context
+${platform === "Facebook" ? "Facebook Feed & Stories | Max 125 chars primary text | 1200×628px" : ""}
+${platform === "Instagram" ? "Instagram Feed & Reels | 1080×1080px | Keep copy punchy" : ""}
+${platform === "Google" ? "Google Display Network | Headline: 30 chars | Description: 90 chars" : ""}
+${platform === "LinkedIn" ? "LinkedIn Feed | Professional tone | 150 char intro" : ""}
+${platform === "TikTok" ? "TikTok In-Feed Ads | Hook in first 3 seconds | High energy" : ""}
+
+Return ONLY a JSON array of exactly 3 objects. Each object must have these exact keys:
+- "headline": string (the ad headline)
+- "body": string (the main ad body copy, use \\n for line breaks)
+- "cta": string (the call to action button text)
+- "platform_note": string (one sentence about platform-specific optimization for this ad)
+
+Example format:
+[
+  {
+    "headline": "...",
+    "body": "...",
+    "cta": "...",
+    "platform_note": "..."
+  }
+]`;
+
+      const message = await client.messages.create({
+        model: "claude-sonnet-4-5",
+        max_tokens: 2000,
+        messages: [{ role: "user", content: prompt }],
+      });
+
+      const raw = message.content[0].type === "text" ? message.content[0].text : "";
+      // Extract JSON array from response
+      const jsonMatch = raw.match(/\[[\s\S]*\]/);
+      if (!jsonMatch) throw new Error("No JSON array found in response");
+
+      const parsed = JSON.parse(jsonMatch[0]) as Array<{
+        headline: string;
+        body: string;
+        cta: string;
+        platform_note: string;
+      }>;
+
+      const result: AdVariation[] = parsed.slice(0, 3).map((v, i) => ({
+        id: `v${i + 1}`,
+        label: `Version ${i + 1}`,
+        headline: v.headline,
+        body: v.body,
+        cta: v.cta,
+        platformNote: v.platform_note,
+      }));
+
+      setVariations(result);
+    } catch (err) {
+      console.error("Claude API error, falling back to mock:", err);
+      await new Promise((r) => setTimeout(r, 300));
+      setVariations(generateAdVariations({ product, audience, tone, platform, benefit, ctaText }));
+    } finally {
+      setIsGenerating(false);
+    }
   }
 
   async function handleCopy(text: string, key: string) {

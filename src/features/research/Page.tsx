@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import type { Easing } from 'framer-motion';
 import {
   BarChart2,
   Users,
@@ -16,6 +17,7 @@ import {
   CheckCircle2,
   Zap,
   Target,
+  Sparkles,
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -28,7 +30,14 @@ import type {
   KeywordIntent,
   CompetitionLevel,
   PricingTier,
+  ResearchData,
 } from '@/stores/research';
+import { getAnthropicClient, resolveApiKey } from '@/lib/ai';
+import { useContextStore } from '@/stores/context';
+import { useUserStore } from '@/stores/user';
+import { useNicheStore } from '@/stores/niche';
+import { useAvatarStore } from '@/stores/avatar';
+import { useOfferStore } from '@/stores/offer';
 
 // ─── Motion helpers ───────────────────────────────────────────────────────────
 
@@ -36,7 +45,7 @@ const fadeIn = {
   initial: { opacity: 0, y: 12 },
   animate: { opacity: 1, y: 0 },
   exit: { opacity: 0, y: -8 },
-  transition: { duration: 0.25, ease: 'easeOut' },
+  transition: { duration: 0.25, ease: 'easeOut' as Easing },
 };
 
 const stagger = {
@@ -746,7 +755,7 @@ function PricingResearchTab() {
 
 // ─── Export report ────────────────────────────────────────────────────────────
 
-function buildReportText(research: ReturnType<typeof useResearchStore>['research']): string {
+function buildReportText(research: ResearchData): string {
   const lines: string[] = [];
   lines.push(`MARKET RESEARCH REPORT`);
   lines.push(`Topic: ${research.topic}`);
@@ -802,7 +811,15 @@ type TabValue = (typeof TABS)[number]['value'];
 
 export default function MarketResearchPage() {
   const [activeTab, setActiveTab] = useState<TabValue>('niche');
-  const { research } = useResearchStore();
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState<string | null>(null);
+  const { research, setResearch } = useResearchStore();
+
+  const getContextString = useContextStore((s) => s.getContextString);
+  const userApiKey = useUserStore((s) => s.user.anthropicApiKey);
+  const niche = useNicheStore((s) => s.niche);
+  const getDefaultAvatar = useAvatarStore((s) => s.getDefaultAvatar);
+  const offer = useOfferStore((s) => s.offer);
 
   const handleExport = () => {
     const text = buildReportText(research);
@@ -814,6 +831,170 @@ export default function MarketResearchPage() {
     a.click();
     URL.revokeObjectURL(url);
   };
+
+  async function handleGenerateAI() {
+    const apiKey = resolveApiKey(userApiKey);
+    if (!apiKey) {
+      setGenerateError('No API key found. Add your Anthropic API key in Settings.');
+      return;
+    }
+
+    setIsGenerating(true);
+    setGenerateError(null);
+
+    try {
+      const businessContext = getContextString();
+      const avatar = getDefaultAvatar();
+      const avatarInfo = avatar
+        ? `Name: ${avatar.name}, Occupation: ${avatar.occupation || 'N/A'}, Goals: ${avatar.goals || 'N/A'}`
+        : 'Not defined';
+      const offerInfo = offer.name
+        ? `${offer.name} at $${offer.price || 'TBD'} — ${offer.clearOutcome || ''}`
+        : 'Not defined';
+      const nicheStatement = niche.fullStatement || (niche.group && niche.outcome ? `I help ${niche.group} ${niche.outcome}` : research.topic);
+
+      const client = getAnthropicClient(apiKey);
+
+      const prompt = `You are a world-class market research analyst. Generate comprehensive, actionable market research data.
+
+${businessContext}
+
+## Research Context
+- Niche/Market: ${nicheStatement}
+- Target Avatar: ${avatarInfo}
+- Core Offer: ${offerInfo}
+- Research Topic: ${research.topic}
+
+Generate detailed market research matching this EXACT JSON schema. Return ONLY valid JSON, no markdown, no explanation.
+
+{
+  "topic": "${research.topic}",
+  "nicheAnalysis": {
+    "marketSize": "e.g. $14.3B",
+    "marketSizeDetail": "brief explanation of market size with growth rate",
+    "competitionLevel": "Low" | "Medium" | "High",
+    "competitionScore": 0-100,
+    "monetizationScore": 0-100,
+    "trendDirection": "growing" | "stable" | "declining",
+    "trendDetail": "specific trend data point with numbers",
+    "subNiches": ["sub-niche 1", "sub-niche 2", "sub-niche 3"],
+    "viabilityScore": 0-100,
+    "viabilityReason": "2-3 sentence explanation"
+  },
+  "competitors": [
+    {
+      "id": "1",
+      "name": "Competitor Name",
+      "offerType": "Type of offer",
+      "pricePoint": "$X–$Y",
+      "audienceSize": "Xk followers/subscribers",
+      "strengths": ["strength 1", "strength 2", "strength 3"],
+      "weaknesses": ["weakness 1", "weakness 2", "weakness 3"],
+      "opportunityGap": "Specific gap you can exploit"
+    }
+  ],
+  "opportunityMatrix": [
+    {
+      "dimension": "Dimension Name",
+      "gap": "Specific gap description",
+      "rating": "High" | "Medium" | "Low"
+    }
+  ],
+  "audiencePsychology": {
+    "coreFears": [
+      { "label": "Fear description", "intensity": 0-100 }
+    ],
+    "burningDesires": [
+      { "label": "Desire description", "intensity": 0-100 }
+    ],
+    "dailyFrustrations": ["frustration 1", "frustration 2"],
+    "aspirationalIdentity": "Quote describing their dream identity",
+    "buyingTriggers": ["trigger 1", "trigger 2"],
+    "objections": [
+      { "objection": "objection text", "overcome": "how to overcome" }
+    ],
+    "exactPhrases": ["phrase 1", "phrase 2"]
+  },
+  "keywords": [
+    {
+      "keyword": "keyword text",
+      "monthlySearches": "1,000",
+      "competition": "Low" | "Medium" | "High",
+      "cpc": "$X.XX",
+      "contentAngle": "Content angle suggestion",
+      "intent": "Awareness" | "Consideration" | "Decision"
+    }
+  ],
+  "contentGaps": [
+    {
+      "keyword": "keyword",
+      "opportunity": "Why this is an opportunity",
+      "searchVolume": "~Xk/mo"
+    }
+  ],
+  "pricingTiers": [
+    {
+      "label": "Budget" | "Mid-Market" | "Premium" | "Ultra-Premium",
+      "range": "$X–$Y",
+      "competitors": [
+        { "name": "Competitor name", "price": "$X" }
+      ],
+      "percentage": 0-100
+    }
+  ],
+  "pricingTips": [
+    { "tip": "Tip title", "detail": "Explanation" }
+  ],
+  "pricingOpportunity": "2-3 sentence description of the pricing opportunity"
+}
+
+Include:
+- 5-6 realistic competitors specific to this niche
+- 5-6 opportunity matrix rows
+- 6 core fears and 6 burning desires with intensity scores
+- 6-8 daily frustrations, 5-6 buying triggers, 4-5 objections, 12-16 exact phrases
+- 15+ keywords across all 3 intent levels (5 Awareness, 6 Consideration, 4+ Decision)
+- 4-5 content gaps
+- All 4 pricing tiers with competitors
+- 5 pricing psychology tips
+
+Make everything highly specific to the niche: "${nicheStatement}"`;
+
+      const message = await client.messages.create({
+        model: 'claude-sonnet-4-5',
+        max_tokens: 8000,
+        messages: [{ role: 'user', content: prompt }],
+      });
+
+      const raw = message.content[0].type === 'text' ? message.content[0].text : '';
+      const jsonMatch = raw.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error('No JSON object found in response');
+
+      const parsed = JSON.parse(jsonMatch[0]) as Partial<ResearchData>;
+
+      // Merge with current research, filling in defaults for any missing fields
+      const updated: ResearchData = {
+        topic: parsed.topic ?? research.topic,
+        nicheAnalysis: parsed.nicheAnalysis ?? research.nicheAnalysis,
+        competitors: parsed.competitors ?? research.competitors,
+        opportunityMatrix: parsed.opportunityMatrix ?? research.opportunityMatrix,
+        audiencePsychology: parsed.audiencePsychology ?? research.audiencePsychology,
+        keywords: parsed.keywords ?? research.keywords,
+        contentGaps: parsed.contentGaps ?? research.contentGaps,
+        pricingTiers: parsed.pricingTiers ?? research.pricingTiers,
+        pricingTips: parsed.pricingTips ?? research.pricingTips,
+        pricingOpportunity: parsed.pricingOpportunity ?? research.pricingOpportunity,
+        lastRefreshed: new Date().toISOString(),
+      };
+
+      setResearch(updated);
+    } catch (err) {
+      console.error('AI research generation error:', err);
+      setGenerateError('Failed to generate research. Please try again.');
+    } finally {
+      setIsGenerating(false);
+    }
+  }
 
   return (
     <div className="page-container space-y-6">
@@ -831,11 +1012,37 @@ export default function MarketResearchPage() {
             </span>
           </p>
         </div>
-        <Button onClick={handleExport} variant="outline" className="gap-2 shrink-0">
-          <Download className="h-4 w-4" />
-          Export Report
-        </Button>
+        <div className="flex gap-2 shrink-0 flex-wrap">
+          <Button
+            onClick={handleGenerateAI}
+            disabled={isGenerating}
+            className="gap-2 bg-[hsl(var(--forest))] hover:bg-[hsl(var(--forest-light))] text-[hsl(var(--primary-foreground))]"
+          >
+            {isGenerating ? (
+              <>
+                <Sparkles className="h-4 w-4 animate-spin" />
+                Generating Research...
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-4 w-4" />
+                Generate AI Research
+              </>
+            )}
+          </Button>
+          <Button onClick={handleExport} variant="outline" className="gap-2">
+            <Download className="h-4 w-4" />
+            Export Report
+          </Button>
+        </div>
       </div>
+
+      {/* Error banner */}
+      {generateError && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {generateError}
+        </div>
+      )}
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabValue)}>

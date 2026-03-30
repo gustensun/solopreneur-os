@@ -184,30 +184,65 @@
   }
 
   .page-container {
-    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8;
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8;
   }
 
   .page-header {
-    @apply mb-6 sm:mb-8;
+    @apply mb-4 sm:mb-6 lg:mb-8;
   }
 
   .page-title {
-    @apply text-2xl sm:text-3xl font-semibold tracking-tight;
+    @apply text-xl sm:text-2xl lg:text-3xl font-semibold tracking-tight;
   }
 
   .page-description {
-    @apply text-muted-foreground mt-1;
+    @apply text-muted-foreground mt-1 text-sm sm:text-base;
   }
 
   .stat-card {
-    @apply glass-card p-4 sm:p-5 flex flex-col gap-1;
+    @apply glass-card p-3 sm:p-4 lg:p-5 flex flex-col gap-1;
   }
 
   .stat-value {
-    @apply text-xl sm:text-2xl font-semibold;
+    @apply text-lg sm:text-xl lg:text-2xl font-semibold;
   }
 
   .stat-label {
     @apply text-xs font-medium uppercase tracking-wider text-muted-foreground;
+  }
+
+  /* Mobile card grid helpers */
+  .card-grid {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6;
+  }
+
+  .card-grid-2 {
+    @apply grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6;
+  }
+}
+
+/* ── Mobile-specific overrides ────────────────────────────────────────────── */
+@media (max-width: 767px) {
+  /* Reduce all glass-card padding on mobile */
+  .glass-card {
+    padding: 1rem !important;
+  }
+
+  /* Ensure two-col grids collapse on mobile */
+  .grid-cols-2 {
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+  }
+
+  /* Chat layout: full width input area */
+  .chat-input-area {
+    padding: 0.75rem 1rem;
+  }
+
+  /* Tighter spacing in page containers */
+  .page-container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+    padding-top: 1rem;
+    padding-bottom: 1rem;
   }
 }

@@ -20,6 +20,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
+import { getAnthropicClient, resolveApiKey } from "@/lib/ai";
+import { useContextStore } from "@/stores/context";
+import { useUserStore } from "@/stores/user";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -284,6 +287,9 @@ export default function VSLGeneratorPage() {
   const wordCount = countWords(fullScriptText);
   const duration = estimateDuration(wordCount);
 
+  const getContextString = useContextStore((s) => s.getContextString);
+  const userApiKey = useUserStore((s) => s.user.anthropicApiKey);
+
   function updateInput(stepId: string, value: string) {
     setStepInputs((prev) => ({ ...prev, [stepId]: value }));
   }
@@ -291,20 +297,113 @@ export default function VSLGeneratorPage() {
   async function handleGenerate() {
     setIsGenerating(true);
     setScript(null);
-    await new Promise((r) => setTimeout(r, 600));
-    setScript(
-      generateVSLScript({
-        hook: stepInputs.hook,
-        problem: stepInputs.problem,
-        solution: stepInputs.solution,
-        proof: stepInputs.proof,
-        cta: stepInputs.cta,
-        product,
-        audience,
-        price,
-      })
-    );
-    setIsGenerating(false);
+
+    const apiKey = resolveApiKey(userApiKey);
+
+    if (!apiKey) {
+      // Fallback to mock
+      await new Promise((r) => setTimeout(r, 600));
+      setScript(
+        generateVSLScript({
+          hook: stepInputs.hook,
+          problem: stepInputs.problem,
+          solution: stepInputs.solution,
+          proof: stepInputs.proof,
+          cta: stepInputs.cta,
+          product,
+          audience,
+          price,
+        })
+      );
+      setIsGenerating(false);
+      return;
+    }
+
+    try {
+      const businessContext = getContextString();
+      const client = getAnthropicClient(apiKey);
+
+      const sectionNotes = [
+        stepInputs.hook ? `Hook notes: ${stepInputs.hook}` : "Hook: AI-generated",
+        stepInputs.problem ? `Problem notes: ${stepInputs.problem}` : "Problem: AI-generated",
+        stepInputs.solution ? `Solution notes: ${stepInputs.solution}` : "Solution: AI-generated",
+        stepInputs.proof ? `Proof notes: ${stepInputs.proof}` : "Proof: AI-generated",
+        stepInputs.cta ? `CTA notes: ${stepInputs.cta}` : "CTA: AI-generated",
+      ].join("\n");
+
+      const prompt = `You are a world-class VSL (Video Sales Letter) scriptwriter. Write a complete, high-converting VSL script.
+
+${businessContext}
+
+## Offer Details
+- Product Name: ${product || "The AI Business Accelerator"}
+- Target Audience: ${audience || "coaches and consultants"}
+- Price: ${price || "$997"}
+
+## User's Input Notes (incorporate these into each section)
+${sectionNotes}
+
+Write a full professional VSL script with 5 sections. Each section should be several paragraphs of complete, ready-to-read script — include stage directions in [BRACKETS], pauses, camera cues, and emotional delivery notes.
+
+Return ONLY a JSON object with exactly these 5 keys:
+- "hook": string (attention-grabbing opener, 150-250 words, includes stage directions)
+- "problem": string (deep pain agitation, 200-300 words, emotional and specific)
+- "solution": string (introduce the offer as the answer, 200-300 words, feature/benefit bullets)
+- "proof": string (testimonials, results, credibility, 150-250 words)
+- "cta": string (clear close with urgency and call to action, 150-250 words)
+
+Format:
+{
+  "hook": "...",
+  "problem": "...",
+  "solution": "...",
+  "proof": "...",
+  "cta": "..."
+}`;
+
+      const message = await client.messages.create({
+        model: "claude-sonnet-4-5",
+        max_tokens: 4000,
+        messages: [{ role: "user", content: prompt }],
+      });
+
+      const raw = message.content[0].type === "text" ? message.content[0].text : "";
+      const jsonMatch = raw.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error("No JSON object found in response");
+
+      const parsed = JSON.parse(jsonMatch[0]) as {
+        hook: string;
+        problem: string;
+        solution: string;
+        proof: string;
+        cta: string;
+      };
+
+      setScript([
+        { label: "Hook — Attention Grabber", icon: "🎣", content: parsed.hook },
+        { label: "Problem — The Pain", icon: "😤", content: parsed.problem },
+        { label: "Solution — Your Offer", icon: "💡", content: parsed.solution },
+        { label: "Proof — Testimonials & Credibility", icon: "⭐", content: parsed.proof },
+        { label: "CTA — The Close", icon: "🚀", content: parsed.cta },
+      ]);
+    } catch (err) {
+      console.error("Claude API error, falling back to mock:", err);
+      await new Promise((r) => setTimeout(r, 300));
+      setScript(
+        generateVSLScript({
+          hook: stepInputs.hook,
+          problem: stepInputs.problem,
+          solution: stepInputs.solution,
+          proof: stepInputs.proof,
+          cta: stepInputs.cta,
+          product,
+          audience,
+          price,
+        })
+      );
+    } finally {
+      setIsGenerating(false);
+    }
   }
 
   async function handleCopy(text: string, key: string) {

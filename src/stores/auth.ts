@@ -33,7 +33,7 @@ function syncUserProfile(user: User | null) {
   useUserStore.getState().updateProfile({ name, email, initials });
 }
 
-export const useAuthStore = create<AuthStore>()((set, get) => ({
+export const useAuthStore = create<AuthStore>()((set) => ({
   session: null,
   user: null,
   loading: true,

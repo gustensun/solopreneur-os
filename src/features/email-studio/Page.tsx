@@ -1212,7 +1212,7 @@ export default function EmailStudioPage() {
     brandVoice: 'conversational',
   });
   const [generating, setGenerating] = useState(false);
-  const [lastGeneratedWithAI, setLastGeneratedWithAI] = useState(false);
+  const [, setLastGeneratedWithAI] = useState(false);
   const emailListRef = useRef<HTMLDivElement>(null);
 
   const activeSequence = sequences.find((s) => s.id === activeSequenceId) ?? null;
@@ -1225,10 +1225,12 @@ export default function EmailStudioPage() {
   const handleGenerate = useCallback(async () => {
     setGenerating(true);
 
-    if (resolveApiKey(user.anthropicApiKey)) {
+    const apiKey = resolveApiKey(user.anthropicApiKey);
+
+    if (apiKey) {
       const toastId = toast.loading(`Generating ${tabMeta.label} with Claude AI…`);
       try {
-        const client = getAnthropicClient(resolveApiKey(user.anthropicApiKey));
+        const client = getAnthropicClient(apiKey);
         const contextString = getContextString();
         const emailCount = tabMeta.count;
         const sequenceDescriptions: Record<SequenceType, string> = {
@@ -1239,56 +1241,72 @@ export default function EmailStudioPage() {
         };
         const sequenceDescription = sequenceDescriptions[activeTab];
 
-        const response = await client.messages.create({
+        let fullText = '';
+        const stream = await client.messages.stream({
           model: 'claude-sonnet-4-5',
-          max_tokens: 6000,
-          system: 'You are a world-class email copywriter who writes high-converting sequences in the style of the best direct response marketers.',
+          max_tokens: 8000,
+          system: `You are a world-class email copywriter specializing in solopreneur businesses. Generate high-converting email sequences that feel personal, not corporate. Use the person's name, business context, and write like a real human who cares about results.`,
           messages: [
             {
               role: 'user',
-              content: `Write a complete ${tabMeta.label} email sequence for:
-Name: ${config.authorName || 'Your Name'}
-Offer: ${config.offerName || 'My Offer'} at $${config.price || '997'}
-Brand Voice: ${config.brandVoice}
-Sequence Type: ${tabMeta.label} (${sequenceDescription})
-${activeTab === 'launch' && config.deadline ? `Cart Deadline: ${config.deadline}` : ''}
+              content: `Write a complete ${tabMeta.label} email sequence.
 
 Business Context:
 ${contextString}
 
-Return ONLY a JSON array where each item is:
+Sequence Details:
+- Type: ${tabMeta.label} (${sequenceDescription})
+- Author Name: ${config.authorName || 'Your Name'}
+- Brand Voice: ${config.brandVoice}
+- Offer Name: ${config.offerName || 'My Offer'}
+- Price: ${config.price || '$997'}
+${activeTab === 'launch' && config.deadline ? `- Cart Deadline: ${config.deadline}` : ''}
+- Number of emails to generate: ${emailCount}
+
+Return ONLY a valid JSON array with exactly ${emailCount} email objects. Each object must follow this schema exactly:
 {
-  "subject": "Subject line",
-  "previewText": "Preview text 50 chars",
-  "body": "Full email body with personalization tokens like {first_name}",
-  "day": 1,
-  "timing": "Send immediately"
+  "number": 1,
+  "purpose": "Short label describing this email's role (e.g. Welcome & First Promise)",
+  "subjectLine": "The email subject line (use {first_name} tokens where natural)",
+  "previewText": "Preview text under 80 chars",
+  "sendTiming": "e.g. Day 0 (Immediately), Day 1, Week 2",
+  "body": "Full email body — write like a real human, use {first_name} tokens, include P.S. lines, be specific and conversion-focused"
 }
 
-Write ${emailCount} emails. Make each email genuinely world-class — specific, emotional, and conversion-focused.`,
+Make each email genuinely world-class — specific, emotional, and conversion-focused. No generic copy.`,
             },
           ],
         });
 
-        const raw = response.content[0].type === 'text' ? response.content[0].text : '';
-        const jsonMatch = raw.match(/\[[\s\S]*\]/);
+        for await (const chunk of stream) {
+          if (
+            chunk.type === 'content_block_delta' &&
+            chunk.delta.type === 'text_delta'
+          ) {
+            fullText += chunk.delta.text;
+          }
+        }
+
+        const jsonMatch = fullText.match(/\[[\s\S]*\]/);
         if (!jsonMatch) throw new Error('No JSON array found in response');
 
         const parsed = JSON.parse(jsonMatch[0]) as {
-          subject: string;
+          number: number;
+          purpose: string;
+          subjectLine: string;
           previewText: string;
+          sendTiming: string;
           body: string;
-          day: number;
-          timing: string;
         }[];
 
-        const emails: Omit<EmailItem, 'id'>[] = parsed.map((item, idx) => ({
-          number: idx + 1,
-          purpose: `Email ${idx + 1}`,
-          subjectLine: item.subject,
+        const emails: EmailItem[] = parsed.map((item, idx) => ({
+          id: generateId(),
+          number: item.number ?? idx + 1,
+          purpose: item.purpose ?? `Email ${idx + 1}`,
+          subjectLine: item.subjectLine,
           previewText: item.previewText,
           body: item.body,
-          sendTiming: item.timing || `Day ${item.day}`,
+          sendTiming: item.sendTiming ?? `Day ${idx + 1}`,
         }));
 
         addSequence({

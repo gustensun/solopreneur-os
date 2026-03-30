@@ -15,6 +15,7 @@ import {
   Moon,
 } from "lucide-react";
 import { AppSidebar } from "./AppSidebar";
+import { CommandPalette } from "@/components/shared/CommandPalette";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -128,6 +129,7 @@ export function DashboardLayout({
 }: DashboardLayoutProps) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [cmdOpen, setCmdOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const hasCompletedOnboarding = useUserStore((s) => s.hasCompletedOnboarding);
@@ -183,6 +185,20 @@ export function DashboardLayout({
           </div>
 
           <div className="flex items-center gap-2">
+            {/* ⌘K Command Palette trigger */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCmdOpen(true)}
+              className="hidden md:flex items-center gap-1.5 h-8 px-2.5 text-xs text-muted-foreground border-border hover:text-foreground"
+              aria-label="Open command palette"
+            >
+              <span>Search</span>
+              <kbd className="flex items-center gap-0.5 rounded bg-muted px-1 py-0.5 font-mono text-[10px]">
+                ⌘K
+              </kbd>
+            </Button>
+
             {/* Theme toggle */}
             <Button
               variant="ghost"
@@ -284,6 +300,9 @@ export function DashboardLayout({
             </DropdownMenu>
           </div>
         </header>
+
+        {/* Global Command Palette */}
+        <CommandPalette open={cmdOpen} onOpenChange={setCmdOpen} />
 
         {/* Page content */}
         <main className="flex-1 overflow-auto">

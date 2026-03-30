@@ -300,8 +300,6 @@ Return ONLY a JSON array of 3 strings. Each variation must be different in appro
     }
   };
 
-  const tokenCount = extractTokens(template.text).length;
-
   return (
     <motion.div
       layout

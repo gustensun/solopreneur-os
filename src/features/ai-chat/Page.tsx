@@ -357,7 +357,7 @@ export default function AIChatPage() {
               </div>
 
               {/* Bubble + actions */}
-              <div className={cn("flex flex-col gap-1.5 max-w-[75%]", isUser && "items-end")}>
+              <div className={cn("flex flex-col gap-1.5 max-w-[85%] sm:max-w-[75%]", isUser && "items-end")}>
                 {/* Bubble */}
                 {isEditing ? (
                   <div className="flex flex-col gap-2 w-full min-w-[300px]">
@@ -459,7 +459,7 @@ export default function AIChatPage() {
 
   // ─── Input area ────────────────────────────────────────────────────────────
   const inputArea = (
-    <div className="shrink-0 border-t border-border bg-background/95 backdrop-blur px-4 pt-3 pb-4">
+    <div className="shrink-0 border-t border-border bg-background/95 backdrop-blur px-3 sm:px-4 pt-3 pb-4 sm:pb-4 safe-area-inset-bottom">
       {/* Context bar */}
       <div className="flex items-center gap-2 mb-2.5 px-1">
         {/* Agent tool selector */}

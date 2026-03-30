@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, type Variants } from 'framer-motion';
 import {
   Mic,
   FileText,
@@ -18,6 +18,10 @@ import {
   Target,
   Brain,
   Zap,
+  Mail,
+  Video,
+  Wand2,
+  BookOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useContextStore } from '@/stores/context';
@@ -101,7 +105,7 @@ function RadialProgress({ score }: { score: number }) {
 
 // ─── stagger animation helpers ───────────────────────────────────────────────
 
-const container = {
+const container: Variants = {
   hidden: { opacity: 0 },
   show: {
     opacity: 1,
@@ -109,9 +113,9 @@ const container = {
   },
 };
 
-const item = {
+const item: Variants = {
   hidden: { opacity: 0, y: 18 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: 'easeOut' } },
+  show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: 'easeOut' as const } },
 };
 
 // ─── quick action cards ──────────────────────────────────────────────────────
@@ -173,6 +177,177 @@ const QUICK_ACTIONS: QuickAction[] = [
     route: '/copy-writer',
     color: 'from-amber-50 to-amber-100 hover:from-amber-100 hover:to-amber-200',
     iconColor: 'text-amber-600 bg-amber-100',
+  },
+];
+
+// ─── AI Daily Focus logic ────────────────────────────────────────────────────
+
+interface FocusRecommendation {
+  headline: string;
+  body: string;
+  cta: string;
+  ctaRoute: string;
+  gradient: string;
+}
+
+function getDailyFocus(params: {
+  score: number;
+  hasNiche: boolean;
+  hasAvatar: boolean;
+  hasOffer: boolean;
+  hasBrand: boolean;
+  hasIncome: boolean;
+  monthlyRevenue: number;
+  userName: string;
+}): FocusRecommendation {
+  const { score, hasNiche, hasAvatar, hasOffer, hasBrand, hasIncome, monthlyRevenue, userName } = params;
+  const firstName = userName?.split(' ')[0] || 'Solopreneur';
+
+  if (!hasNiche) {
+    return {
+      headline: `Start with your niche, ${firstName}`,
+      body: "Your niche statement is the foundation of everything — AI tools, copy, offers — they all need it to be precise. This is your #1 priority today.",
+      cta: 'Define Your Niche',
+      ctaRoute: '/niche-statement',
+      gradient: 'from-violet-500 to-purple-600',
+    };
+  }
+
+  if (!hasAvatar) {
+    return {
+      headline: 'Build your target avatar',
+      body: "You've defined your niche — now build the avatar. Knowing exactly who you serve unlocks laser-focused copy, offers, and content that converts.",
+      cta: 'Create Your Avatar',
+      ctaRoute: '/avatar-architect',
+      gradient: 'from-blue-500 to-cyan-600',
+    };
+  }
+
+  if (!hasOffer) {
+    return {
+      headline: 'Create your core offer',
+      body: "You know your niche and avatar. The missing piece? A compelling offer. Build it today and you'll have something worth selling tomorrow.",
+      cta: 'Build Your Offer',
+      ctaRoute: '/offer-creator',
+      gradient: 'from-rose-500 to-pink-600',
+    };
+  }
+
+  if (!hasBrand) {
+    return {
+      headline: 'Define your brand voice',
+      body: "With a niche, avatar, and offer in place, your brand voice will make all your content consistent and magnetic. Set it up in under 10 minutes.",
+      cta: 'Build Brand Voice',
+      ctaRoute: '/personal-brand',
+      gradient: 'from-amber-500 to-orange-600',
+    };
+  }
+
+  if (!hasIncome) {
+    return {
+      headline: 'Set up your income streams',
+      body: "Track what you earn so you can grow it. Add your current or planned income streams to unlock revenue projections and clarity.",
+      cta: 'Add Income Streams',
+      ctaRoute: '/income-streams',
+      gradient: 'from-emerald-500 to-teal-600',
+    };
+  }
+
+  if (score < 50) {
+    return {
+      headline: `Your AI context is at ${score}% — let's improve it`,
+      body: "The more context your AI has, the better every output becomes. Fill in the remaining sections in your Context Hub to unlock smarter AI assistance.",
+      cta: 'Complete Context Hub',
+      ctaRoute: '/context-hub',
+      gradient: 'from-[#2d6a4f] to-[#1b4332]',
+    };
+  }
+
+  if (monthlyRevenue === 0) {
+    return {
+      headline: 'Time to generate your first revenue',
+      body: "Your business OS is set up. Now it's time to attract clients. Use the AI Chat to strategize your outreach, or generate ad copy to start driving traffic.",
+      cta: 'Chat with AI Strategist',
+      ctaRoute: '/ai-chat',
+      gradient: 'from-[#52b788] to-[#2d6a4f]',
+    };
+  }
+
+  return {
+    headline: `Strong foundation, ${firstName} — now scale it`,
+    body: `You're generating $${monthlyRevenue.toLocaleString()}/mo and your AI context is at ${score}%. Focus today on creating content that attracts your ideal clients at scale.`,
+    cta: 'Create Content',
+    ctaRoute: '/projects',
+    gradient: 'from-[#2d6a4f] to-[#52b788]',
+  };
+}
+
+// ─── quick create actions ─────────────────────────────────────────────────────
+
+interface QuickCreateAction {
+  label: string;
+  icon: React.ElementType;
+  route: string;
+  color: string;
+  iconBg: string;
+}
+
+const QUICK_CREATE_ACTIONS: QuickCreateAction[] = [
+  {
+    label: 'Write Email',
+    icon: Mail,
+    route: '/email-studio',
+    color: 'hover:bg-blue-50 dark:hover:bg-blue-950/30',
+    iconBg: 'bg-blue-100 text-blue-600',
+  },
+  {
+    label: 'Generate Hooks',
+    icon: Zap,
+    route: '/hooks',
+    color: 'hover:bg-amber-50 dark:hover:bg-amber-950/30',
+    iconBg: 'bg-amber-100 text-amber-600',
+  },
+  {
+    label: 'Make VSL',
+    icon: Video,
+    route: '/vsl-generator',
+    color: 'hover:bg-rose-50 dark:hover:bg-rose-950/30',
+    iconBg: 'bg-rose-100 text-rose-600',
+  },
+  {
+    label: 'Write Copy',
+    icon: Wand2,
+    route: '/copy-writer',
+    color: 'hover:bg-violet-50 dark:hover:bg-violet-950/30',
+    iconBg: 'bg-violet-100 text-violet-600',
+  },
+  {
+    label: 'AI Chat',
+    icon: Brain,
+    route: '/ai-chat',
+    color: 'hover:bg-emerald-50 dark:hover:bg-emerald-950/30',
+    iconBg: 'bg-emerald-100 text-emerald-600',
+  },
+  {
+    label: 'AI Voice',
+    icon: Mic,
+    route: '/voice-call',
+    color: 'hover:bg-purple-50 dark:hover:bg-purple-950/30',
+    iconBg: 'bg-purple-100 text-purple-600',
+  },
+  {
+    label: 'Write Ads',
+    icon: Megaphone,
+    route: '/ad-writer',
+    color: 'hover:bg-orange-50 dark:hover:bg-orange-950/30',
+    iconBg: 'bg-orange-100 text-orange-600',
+  },
+  {
+    label: 'Build Slides',
+    icon: BookOpen,
+    route: '/slides',
+    color: 'hover:bg-teal-50 dark:hover:bg-teal-950/30',
+    iconBg: 'bg-teal-100 text-teal-600',
   },
 ];
 
@@ -250,6 +425,21 @@ export default function DashboardPage() {
 
   const avatar = getDefaultAvatar();
 
+  const dailyFocus = useMemo(
+    () =>
+      getDailyFocus({
+        score,
+        hasNiche: !!(niche.group && niche.outcome && niche.benefit && niche.pain),
+        hasAvatar: !!(avatar && avatar.name && avatar.goals),
+        hasOffer: !!(offer.name && offer.price),
+        hasBrand: brand.progress >= 30,
+        hasIncome: streams.length > 0,
+        monthlyRevenue: monthlyTotal,
+        userName: user.name || '',
+      }),
+    [score, niche, avatar, offer, brand, streams, monthlyTotal, user.name]
+  );
+
   // Business completion checklist
   const checklistItems = useMemo(
     () => [
@@ -324,6 +514,89 @@ export default function DashboardPage() {
         <p className="mt-1 text-sm text-[#6b7280]">
           Your business OS is ready. Here&apos;s where you stand today.
         </p>
+      </motion.div>
+
+      {/* ── AI Daily Focus card ── */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.1 }}
+        className="mb-6"
+      >
+        <div
+          className={cn(
+            'relative overflow-hidden rounded-2xl bg-gradient-to-r p-6 text-white shadow-lg',
+            dailyFocus.gradient
+          )}
+        >
+          {/* Decorative circles */}
+          <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/10" />
+          <div className="pointer-events-none absolute -bottom-6 right-16 h-24 w-24 rounded-full bg-white/5" />
+
+          <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/20">
+                <Sparkles className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-white/70 mb-1">
+                  AI Daily Focus
+                </p>
+                <h2 className="text-lg font-bold leading-snug">{dailyFocus.headline}</h2>
+                <p className="mt-1 text-sm text-white/80 max-w-xl">{dailyFocus.body}</p>
+              </div>
+            </div>
+            <button
+              onClick={() => navigate(dailyFocus.ctaRoute)}
+              className="shrink-0 flex items-center gap-2 rounded-xl bg-white/20 px-4 py-2.5 text-sm font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/30 hover:shadow-md sm:self-center"
+            >
+              {dailyFocus.cta}
+              <ArrowRight className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* ── Quick Create ── */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.15 }}
+        className="mb-6"
+      >
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-[#6b7280]">
+            Quick Create
+          </h2>
+          <Wand2 className="h-4 w-4 text-[#52b788]" />
+        </div>
+        <div className="grid grid-cols-4 gap-2 sm:grid-cols-8">
+          {QUICK_CREATE_ACTIONS.map((action) => {
+            const Icon = action.icon;
+            return (
+              <button
+                key={action.label}
+                onClick={() => navigate(action.route)}
+                className={cn(
+                  'group flex flex-col items-center gap-2 rounded-xl border border-[#e8f5e9] bg-white p-3 text-center transition-all hover:shadow-sm hover:-translate-y-0.5',
+                  action.color
+                )}
+              >
+                <div
+                  className={cn(
+                    'flex h-8 w-8 items-center justify-center rounded-lg text-sm',
+                    action.iconBg
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                </div>
+                <span className="text-[11px] font-medium leading-tight text-[#374151]">
+                  {action.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </motion.div>
 
       <motion.div

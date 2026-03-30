@@ -95,6 +95,7 @@ export interface ResearchData {
 interface ResearchStore {
   research: ResearchData;
   setTopic: (topic: string) => void;
+  setResearch: (data: ResearchData) => void;
   refreshSection: (section: keyof Omit<ResearchData, 'topic' | 'lastRefreshed'>) => void;
   resetToDefaults: () => void;
 }
@@ -388,6 +389,8 @@ export const useResearchStore = create<ResearchStore>()(
         set((state) => ({
           research: { ...state.research, topic, lastRefreshed: new Date().toISOString() },
         })),
+
+      setResearch: (data) => set({ research: data }),
 
       refreshSection: (section) =>
         set((state) => ({

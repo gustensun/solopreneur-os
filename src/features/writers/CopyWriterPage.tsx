@@ -1,12 +1,15 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { FileText, Sparkles, Copy, Check, RotateCcw, Wand2 } from "lucide-react";
+import { FileText, Sparkles, Copy, Check, RotateCcw, Wand2, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { getAnthropicClient, resolveApiKey } from "@/lib/ai";
+import { useUserStore } from "@/stores/user";
+import { useContextStore } from "@/stores/context";
 
 // ─── Mock generator ────────────────────────────────────────────────────────────
 
@@ -80,14 +83,92 @@ export default function CopyWriterPage() {
   const [guarantee, setGuarantee] = useState("");
 
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
   const [output, setOutput] = useState<SalesPageOutput | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+
+  const { user } = useUserStore();
+  const { getContextString } = useContextStore();
 
   async function handleGenerate() {
     setIsGenerating(true);
     setOutput(null);
-    await new Promise((r) => setTimeout(r, 500));
-    setOutput(generateSalesPage({ product, audience, painPoints, benefits, price, guarantee }));
+
+    const apiKey = resolveApiKey(user.anthropicApiKey);
+
+    if (apiKey) {
+      try {
+        setIsStreaming(true);
+        const client = getAnthropicClient(apiKey);
+        const contextString = getContextString();
+
+        let fullText = "";
+        const stream = await client.messages.stream({
+          model: "claude-sonnet-4-5",
+          max_tokens: 6000,
+          system: `You are a world-class direct response copywriter. Write sales page copy that converts. Be specific, use power words, address objections, and create urgency. Never be generic.`,
+          messages: [
+            {
+              role: "user",
+              content: `Write a complete, high-converting sales page for:
+
+Business Context:
+${contextString}
+
+Product Details:
+- Product / Offer Name: ${product || "The Accelerator"}
+- Target Audience: ${audience || "entrepreneurs"}
+- Pain Points: ${painPoints || "struggling to get clients, no systems, trading time for money"}
+- Key Benefits: ${benefits || "go from 0 to $10k/month, done-for-you systems, weekly coaching"}
+- Price: ${price || "$997"}
+- Guarantee: ${guarantee || "30-day money-back"}
+
+Return ONLY a valid JSON object with exactly these keys:
+{
+  "headline": "Main headline — bold, specific, outcome-driven",
+  "subheadline": "Supporting subheadline that bridges desire and offer",
+  "problem": "Problem section — agitate the pain, make it visceral and real",
+  "solution": "Solution section — introduce the offer as the answer, build desire",
+  "benefits": "Benefits section — list all key benefits and bonuses with value",
+  "testimonials": "Social proof section — 2-3 compelling testimonials with results",
+  "offer": "The full offer stack — everything included with real/perceived value",
+  "guarantee": "The guarantee — make it bold and risk-reversing",
+  "cta": "Call to action — urgent, specific, action-oriented"
+}
+
+Write every section as if this is a real product with real results. Be specific with numbers. Use power words. Address the reader's exact fears and desires.`,
+            },
+          ],
+        });
+
+        for await (const chunk of stream) {
+          if (
+            chunk.type === "content_block_delta" &&
+            chunk.delta.type === "text_delta"
+          ) {
+            fullText += chunk.delta.text;
+          }
+        }
+
+        setIsStreaming(false);
+
+        const jsonMatch = fullText.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) throw new Error("No JSON object found in response");
+
+        const parsed = JSON.parse(jsonMatch[0]) as SalesPageOutput;
+        setOutput(parsed);
+      } catch (err) {
+        console.error("AI sales page generation failed:", err);
+        setIsStreaming(false);
+        // Fallback to template
+        setOutput(generateSalesPage({ product, audience, painPoints, benefits, price, guarantee }));
+      }
+    } else {
+      // No API key — use template fallback
+      await new Promise((r) => setTimeout(r, 500));
+      setOutput(generateSalesPage({ product, audience, painPoints, benefits, price, guarantee }));
+    }
+
     setIsGenerating(false);
   }
 
@@ -103,6 +184,19 @@ export default function CopyWriterPage() {
     await navigator.clipboard.writeText(full);
     setCopied("all");
     setTimeout(() => setCopied(null), 1800);
+  }
+
+  function handleDownloadAll() {
+    if (!output) return;
+    const full = SECTIONS.map((s) => `## ${s.label}\n\n${output[s.key]}`).join("\n\n---\n\n");
+    const header = `SALES PAGE: ${product || "My Offer"}\n${"═".repeat(50)}\n\n`;
+    const blob = new Blob([header + full], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${(product || "sales-page").replace(/[^a-z0-9]/gi, "-").toLowerCase()}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   return (
@@ -199,12 +293,16 @@ export default function CopyWriterPage() {
             {isGenerating ? (
               <>
                 <Sparkles className="h-4 w-4 animate-spin" />
-                Writing Your Sales Page...
+                {isStreaming ? "Claude is writing…" : "Writing Your Sales Page..."}
               </>
             ) : (
               <>
-                <Wand2 className="h-4 w-4" />
-                Generate Sales Page
+                {resolveApiKey(user.anthropicApiKey) ? (
+                  <Sparkles className="h-4 w-4" />
+                ) : (
+                  <Wand2 className="h-4 w-4" />
+                )}
+                {resolveApiKey(user.anthropicApiKey) ? "✨ Generate with AI" : "Generate Sales Page"}
               </>
             )}
           </Button>
@@ -224,6 +322,10 @@ export default function CopyWriterPage() {
                 >
                   {copied === "all" ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5" />}
                   {copied === "all" ? "Copied!" : "Copy All"}
+                </Button>
+                <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs" onClick={handleDownloadAll}>
+                  <Download className="h-3.5 w-3.5" />
+                  Download
                 </Button>
                 <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs" onClick={handleGenerate}>
                   <RotateCcw className="h-3.5 w-3.5" />

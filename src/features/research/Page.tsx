@@ -188,14 +188,14 @@ function NicheAnalysisTab() {
           title="Research Topic"
           description="Describe your niche or market to analyze its viability"
         />
-        <div className="flex gap-3">
+        <div className="flex flex-col sm:flex-row gap-3">
           <Textarea
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             placeholder="e.g. AI Business Coaching for Solopreneurs"
             className="resize-none h-20 bg-background"
           />
-          <Button onClick={handleAnalyze} className="shrink-0 self-end">
+          <Button onClick={handleAnalyze} className="shrink-0 sm:self-end">
             <Zap className="h-4 w-4 mr-2" />
             Analyze
           </Button>

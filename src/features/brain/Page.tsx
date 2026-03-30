@@ -195,9 +195,9 @@ export default function BrainPage() {
       </div>
 
       {/* Main layout: sidebar + content */}
-      <div className="flex gap-5 min-h-[600px]">
+      <div className="flex flex-col lg:flex-row gap-5 min-h-[600px]">
         {/* Left Sidebar */}
-        <div className="w-60 shrink-0 flex flex-col gap-4">
+        <div className="w-full lg:w-60 lg:shrink-0 flex flex-col gap-4">
           {/* Profiles */}
           <div className="glass-card p-4">
             <div className="flex items-center justify-between mb-3">

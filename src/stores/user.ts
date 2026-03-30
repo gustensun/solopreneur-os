@@ -8,14 +8,18 @@ const defaultUser: UserProfile = {
   email: 'gusten@gustensun.com',
   initials: 'GS',
   avatarUrl: undefined,
+  anthropicApiKey: '',
 };
 
 interface UserStore {
   user: UserProfile;
   isAuthenticated: boolean;
+  hasCompletedOnboarding: boolean;
 
   updateProfile: (updates: Partial<UserProfile>) => void;
   setAvatarUrl: (url: string) => void;
+  setApiKey: (key: string) => void;
+  completeOnboarding: () => void;
 }
 
 export const useUserStore = create<UserStore>()(
@@ -23,6 +27,7 @@ export const useUserStore = create<UserStore>()(
     (set) => ({
       user: defaultUser,
       isAuthenticated: true,
+      hasCompletedOnboarding: false,
 
       updateProfile: (updates) => {
         set((state) => ({ user: { ...state.user, ...updates } }));
@@ -30,6 +35,14 @@ export const useUserStore = create<UserStore>()(
 
       setAvatarUrl: (url) => {
         set((state) => ({ user: { ...state.user, avatarUrl: url } }));
+      },
+
+      setApiKey: (key) => {
+        set((state) => ({ user: { ...state.user, anthropicApiKey: key } }));
+      },
+
+      completeOnboarding: () => {
+        set({ hasCompletedOnboarding: true });
       },
     }),
     { name: 'solopreneur-user' }

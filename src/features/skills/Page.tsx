@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
+import { toast } from "sonner";
 import {
   Wand2,
   Search,
@@ -20,6 +21,7 @@ import {
   Zap,
   Megaphone,
   Star,
+  Clipboard,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,7 +36,16 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useSkillsStore } from "@/stores/skills";
+import { useUserStore } from "@/stores/user";
+import { useNicheStore } from "@/stores/niche";
+import { useOfferStore } from "@/stores/offer";
+import { useAvatarStore } from "@/stores/avatar";
 import type { Skill, SkillType } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -239,15 +250,69 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
+function isoDate(iso: string) {
+  return iso.slice(0, 10); // YYYY-MM-DD
+}
+
+function yamlStr(value: string) {
+  // Wrap in double quotes and escape any internal double quotes
+  return `"${value.replace(/"/g, '\\"')}"`;
+}
+
+function buildSkillMarkdown(skill: Skill): string {
+  const user = useUserStore.getState().user;
+  const niche = useNicheStore.getState().niche;
+  const offer = useOfferStore.getState().offer;
+  const avatar = useAvatarStore.getState().getDefaultAvatar();
+
+  const nicheStr = niche.fullStatement
+    ? niche.fullStatement.slice(0, 100)
+    : niche.group
+    ? `I help ${niche.group} ${niche.outcome}`
+    : "Not yet defined";
+
+  const offerStr =
+    offer.name && offer.price
+      ? `${offer.name} at $${offer.price}`
+      : offer.name || "Not yet defined";
+
+  const avatarStr = avatar ? avatar.name : "Not yet defined";
+
+  const tags = [skill.type, ...skill.title.toLowerCase().split(/\s+/)].filter(
+    (t, i, arr) => arr.indexOf(t) === i
+  );
+
+  const frontmatter = [
+    "---",
+    `title: ${yamlStr(skill.title)}`,
+    `type: ${skill.type}`,
+    `version: ${skill.version}.0`,
+    `created: ${isoDate(skill.createdAt)}`,
+    `owner: ${yamlStr(user.name || "Unknown")}`,
+    `niche: ${yamlStr(nicheStr)}`,
+    `offer: ${yamlStr(offerStr)}`,
+    `avatar: ${yamlStr(avatarStr)}`,
+    `tags: [${tags.join(", ")}]`,
+    "---",
+  ].join("\n");
+
+  return `${frontmatter}\n\n# ${skill.title}\n\n${skill.content}`;
+}
+
 function exportSkill(skill: Skill) {
-  const content = `# ${skill.title}\n\n${skill.description}\n\nType: ${skill.type}\nVersion: ${skill.version}\nLast updated: ${formatDate(skill.updatedAt)}\n\n---\n\n${skill.content}`;
-  const blob = new Blob([content], { type: "text/markdown" });
+  const markdown = buildSkillMarkdown(skill);
+  const blob = new Blob([markdown], { type: "text/markdown" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
   a.download = `${skill.title.toLowerCase().replace(/\s+/g, "-")}-v${skill.version}.md`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+async function copySkillForClaude(skill: Skill) {
+  const markdown = buildSkillMarkdown(skill);
+  await navigator.clipboard.writeText(markdown);
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -435,10 +500,29 @@ export default function SkillsPage() {
                       >
                         <RefreshCw className="h-3.5 w-3.5" />
                       </button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            onClick={() =>
+                              copySkillForClaude(skill).then(() =>
+                                toast.success("Copied! Paste into a Claude Project as a custom instruction.")
+                              ).catch(() =>
+                                toast.error("Could not access clipboard.")
+                              )
+                            }
+                            className="p-1.5 rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                          >
+                            <Clipboard className="h-3.5 w-3.5" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="text-xs max-w-[200px] text-center">
+                          Copy for Claude Projects — paste as a custom instruction
+                        </TooltipContent>
+                      </Tooltip>
                       <button
                         onClick={() => exportSkill(skill)}
                         className="p-1.5 rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-                        title="Export"
+                        title="Export .md"
                       >
                         <Download className="h-3.5 w-3.5" />
                       </button>

@@ -8,13 +8,18 @@ import {
   Search,
   X,
   Type,
+  Sparkles,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { getAnthropicClient } from '@/lib/ai';
+import { useUserStore } from '@/stores/user';
+import { useContextStore } from '@/stores/context';
 import { useCopyVaultStore } from '@/stores/copyVault';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -222,7 +227,11 @@ function TemplateCard({
   onFillIn: (template: CopyTemplate) => void;
 }) {
   const { toggleFavorite, isFavorite } = useCopyVaultStore();
+  const { user } = useUserStore();
+  const { getContextString } = useContextStore();
   const [copied, setCopied] = useState(false);
+  const [generatingVariations, setGeneratingVariations] = useState(false);
+  const [variations, setVariations] = useState<string[]>([]);
   const fav = isFavorite(template.id);
 
   const handleCopy = async (e: React.MouseEvent) => {
@@ -230,6 +239,65 @@ function TemplateCard({
     await navigator.clipboard.writeText(template.text);
     setCopied(true);
     setTimeout(() => setCopied(false), 1800);
+  };
+
+  const handleVariations = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!user.anthropicApiKey) {
+      // Static fallback: generate simple variations
+      const staticVariations = [
+        template.text.replace(/\{(\w+)\}/g, '[Your $1]'),
+        `ALTERNATIVE: ${template.text}`,
+        `VARIATION: ${template.text}`,
+      ];
+      setVariations(staticVariations);
+      return;
+    }
+
+    setGeneratingVariations(true);
+    const toastId = toast.loading('Generating AI variations…');
+    try {
+      const client = getAnthropicClient(user.anthropicApiKey);
+      const contextString = getContextString();
+
+      const response = await client.messages.create({
+        model: 'claude-sonnet-4-5',
+        max_tokens: 1024,
+        system: 'You are Dan Kennedy, Gary Halbert, and Alex Hormozi combined — the world\'s best direct response copywriter.',
+        messages: [
+          {
+            role: 'user',
+            content: `Create 3 powerful variations of this copy template:
+Original: ${template.text}
+Category: ${template.category}
+Use Case: ${template.useCase}
+
+Business Context:
+${contextString}
+
+Return ONLY a JSON array of 3 strings. Each variation must be different in approach (emotional, logical, urgency-based) but achieve the same goal. Use {token} placeholders where appropriate.`,
+          },
+        ],
+      });
+
+      const raw = response.content[0].type === 'text' ? response.content[0].text : '';
+      const jsonMatch = raw.match(/\[[\s\S]*\]/);
+      if (!jsonMatch) throw new Error('No JSON array found in response');
+
+      const parsed = JSON.parse(jsonMatch[0]) as string[];
+      setVariations(parsed.slice(0, 3));
+      toast.success('3 AI variations generated!', { id: toastId });
+    } catch (err) {
+      console.error('AI variations failed:', err);
+      toast.warning('AI generation failed — showing static variations.', { id: toastId });
+      setVariations([
+        template.text.replace(/\{(\w+)\}/g, '[Your $1]'),
+        `VARIATION 2: ${template.text}`,
+        `VARIATION 3: ${template.text}`,
+      ]);
+    } finally {
+      setGeneratingVariations(false);
+    }
   };
 
   const tokenCount = extractTokens(template.text).length;
@@ -262,6 +330,28 @@ function TemplateCard({
         ))}
       </div>
 
+      {variations.length > 0 && (
+        <div className="flex flex-col gap-2 pt-2 border-t border-border/30" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center gap-1.5">
+            <Sparkles className="w-3 h-3 text-violet-500" />
+            <span className="text-xs font-semibold text-violet-700">AI Variations</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-5 w-5 p-0 ml-auto"
+              onClick={(e) => { e.stopPropagation(); setVariations([]); }}
+            >
+              <X className="w-3 h-3" />
+            </Button>
+          </div>
+          {variations.map((v, i) => (
+            <div key={i} className="bg-violet-50 border border-violet-100 rounded-lg p-2 text-xs leading-relaxed text-foreground">
+              {v}
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="flex items-center gap-1.5 pt-1 border-t border-border/40">
         <Button
           variant="outline"
@@ -272,9 +362,22 @@ function TemplateCard({
           {copied ? <Check className="w-3 h-3 text-green-600" /> : <Copy className="w-3 h-3" />}
           {copied ? 'Copied!' : 'Quick Copy'}
         </Button>
-        <span className="text-xs text-muted-foreground ml-1">
-          {tokenCount > 0 ? `${tokenCount} token${tokenCount !== 1 ? 's' : ''}` : 'Ready to use'}
-        </span>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 text-xs gap-1 text-violet-700 border-violet-200 hover:bg-violet-50"
+          disabled={generatingVariations}
+          onClick={handleVariations}
+        >
+          {generatingVariations ? (
+            <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 0.8, ease: 'linear' }}>
+              <Sparkles className="w-3 h-3" />
+            </motion.div>
+          ) : (
+            <Sparkles className="w-3 h-3" />
+          )}
+          Variations
+        </Button>
         <div className="ml-auto flex items-center gap-1">
           <span className={cn(
             'text-xs font-medium transition-colors',
@@ -305,9 +408,14 @@ function FillInPanel({
   initialTemplate: CopyTemplate | null;
   onClose: () => void;
 }) {
+  const { user } = useUserStore();
+  const { getContextString } = useContextStore();
   const [customText, setCustomText] = useState(initialTemplate?.text ?? '');
   const [tokenValues, setTokenValues] = useState<Record<string, string>>({});
   const [copied, setCopied] = useState(false);
+  const [polishing, setPolishing] = useState(false);
+  const [polishedText, setPolishedText] = useState('');
+  const [copiedPolished, setCopiedPolished] = useState(false);
 
   const tokens = useMemo(() => extractTokens(customText), [customText]);
   const filled = useMemo(() => replaceTokens(customText, tokenValues), [customText, tokenValues]);
@@ -318,6 +426,47 @@ function FillInPanel({
     await navigator.clipboard.writeText(filled);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handlePolish = async () => {
+    if (!user.anthropicApiKey || !filled.trim()) return;
+    setPolishing(true);
+    setPolishedText('');
+    const toastId = toast.loading('Polishing with Claude AI…');
+    try {
+      const client = getAnthropicClient(user.anthropicApiKey);
+      const contextString = getContextString();
+      const response = await client.messages.create({
+        model: 'claude-sonnet-4-5',
+        max_tokens: 512,
+        messages: [
+          {
+            role: 'user',
+            content: `Refine this copy to be more compelling and punchy. Keep the same structure and all filled-in values. Return ONLY the improved copy text.
+
+Copy:
+${filled}
+
+Business Context:
+${contextString}`,
+          },
+        ],
+      });
+      const polished = response.content[0].type === 'text' ? response.content[0].text.trim() : '';
+      setPolishedText(polished);
+      toast.success('Copy polished with AI!', { id: toastId });
+    } catch (err) {
+      console.error('AI polish failed:', err);
+      toast.error('AI polish failed. Try again.', { id: toastId });
+    } finally {
+      setPolishing(false);
+    }
+  };
+
+  const handleCopyPolished = async () => {
+    await navigator.clipboard.writeText(polishedText);
+    setCopiedPolished(true);
+    setTimeout(() => setCopiedPolished(false), 2000);
   };
 
   return (
@@ -364,19 +513,56 @@ function FillInPanel({
       )}
 
       {customText && (
-        <div className="flex-1">
-          <Label className="text-xs font-semibold mb-1.5 block">Live Preview</Label>
+        <div className="flex-1 flex flex-col gap-2">
+          <Label className="text-xs font-semibold mb-0.5 block">Live Preview</Label>
           <div className="bg-muted/20 border border-border/40 rounded-lg p-3 text-sm leading-relaxed min-h-[80px]">
             {hasUnfilled ? highlightTokens(filled) : filled}
           </div>
           <Button
-            className="mt-2 w-full gap-2 bg-[hsl(160_40%_12%)] hover:bg-[hsl(160_40%_16%)] text-white"
+            className="w-full gap-2 bg-[hsl(160_40%_12%)] hover:bg-[hsl(160_40%_16%)] text-white"
             size="sm"
             onClick={handleCopyFilled}
           >
             {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
             {copied ? 'Copied!' : 'Copy Completed Copy'}
           </Button>
+          {user.anthropicApiKey && !hasUnfilled && filled.trim() && (
+            <Button
+              variant="outline"
+              className="w-full gap-2 border-violet-200 text-violet-700 hover:bg-violet-50"
+              size="sm"
+              disabled={polishing}
+              onClick={handlePolish}
+            >
+              {polishing ? (
+                <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 0.8, ease: 'linear' }}>
+                  <Sparkles className="w-3.5 h-3.5" />
+                </motion.div>
+              ) : (
+                <Sparkles className="w-3.5 h-3.5" />
+              )}
+              {polishing ? 'Polishing…' : '✨ Polish with AI'}
+            </Button>
+          )}
+          {polishedText && (
+            <div className="flex flex-col gap-2 pt-1">
+              <div className="flex items-center gap-1.5">
+                <Sparkles className="w-3 h-3 text-violet-500" />
+                <Label className="text-xs font-semibold text-violet-700">AI-Polished Version</Label>
+              </div>
+              <div className="bg-violet-50 border border-violet-100 rounded-lg p-3 text-sm leading-relaxed">
+                {polishedText}
+              </div>
+              <Button
+                className="w-full gap-2 bg-violet-600 hover:bg-violet-700 text-white"
+                size="sm"
+                onClick={handleCopyPolished}
+              >
+                {copiedPolished ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                {copiedPolished ? 'Copied!' : 'Copy Polished Copy'}
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -417,7 +603,7 @@ export default function CopyVaultPage() {
   const catMeta = CATEGORIES.find((c) => c.value === activeCategory);
 
   return (
-    <div className="min-h-screen bg-[#f5f0e8] p-6">
+    <div className="min-h-screen bg-[#f5f0e8] p-4 sm:p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-6">
@@ -430,7 +616,7 @@ export default function CopyVaultPage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr_320px] gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr_320px] gap-4 sm:gap-6">
           {/* ── Sidebar Navigation ── */}
           <div className="flex flex-col gap-1.5">
             <div className="bg-white/90 border border-border/70 rounded-xl shadow-sm p-2">

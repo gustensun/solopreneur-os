@@ -3,6 +3,8 @@ import { persist } from 'zustand/middleware';
 import { generateId } from '@/lib/utils';
 import type { AIConversation, AIMessage, AttachedFile, AgentTool, AIModel } from '@/types';
 import { useContextStore } from '@/stores/context';
+import { useUserStore } from '@/stores/user';
+import { getAnthropicClient, resolveModelId } from '@/lib/ai';
 
 // Context-aware responses — keyed by keyword patterns in the user's message
 const CONTEXTUAL_RESPONSES: Array<{ keywords: string[]; response: (ctx: string) => string }> = [
@@ -177,35 +179,115 @@ export const useChatStore = create<ChatStore>()(
           ),
         }));
 
-        // Simulate streaming with context-aware response
-        const fullResponse = getMockResponse(content);
-        let charIndex = 0;
+        const apiKey = useUserStore.getState().user.anthropicApiKey;
 
-        const interval = setInterval(() => {
-          charIndex++;
-          const partialContent = fullResponse.slice(0, charIndex);
+        if (apiKey) {
+          // Real Anthropic streaming
+          const model = get().model;
+          const contextString = useContextStore.getState().getContextString();
+          const system =
+            'You are a world-class AI business coach and strategist for solopreneurs. Be direct, insightful, and actionable.\n\n' +
+            contextString;
 
-          set((state) => ({
-            conversations: state.conversations.map((c) =>
-              c.id === conversationId
-                ? {
-                    ...c,
-                    messages: c.messages.map((m) =>
-                      m.id === assistantMessageId
-                        ? { ...m, content: partialContent }
-                        : m
-                    ),
-                    updatedAt: new Date().toISOString(),
-                  }
-                : c
-            ),
-          }));
+          // Build messages array from existing conversation (excluding the placeholder we just added)
+          const conv = get().conversations.find((c) => c.id === conversationId);
+          const history: Array<{ role: 'user' | 'assistant'; content: string }> =
+            (conv?.messages ?? [])
+              .filter((m) => m.id !== assistantMessageId && m.content.length > 0)
+              .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }));
 
-          if (charIndex >= fullResponse.length) {
-            clearInterval(interval);
-            set({ isStreaming: false });
-          }
-        }, AI_RESPONSE_DELAY_MS);
+          const client = getAnthropicClient(apiKey);
+
+          (async () => {
+            try {
+              const stream = client.messages.stream({
+                model: resolveModelId(model),
+                max_tokens: 2048,
+                system,
+                messages: history,
+              });
+
+              stream.on('text', (text) => {
+                set((state) => ({
+                  conversations: state.conversations.map((c) =>
+                    c.id === conversationId
+                      ? {
+                          ...c,
+                          messages: c.messages.map((m) =>
+                            m.id === assistantMessageId
+                              ? { ...m, content: m.content + text }
+                              : m
+                          ),
+                          updatedAt: new Date().toISOString(),
+                        }
+                      : c
+                  ),
+                }));
+              });
+
+              await stream.done();
+              set({ isStreaming: false });
+            } catch (err) {
+              console.error('Anthropic stream error, falling back to mock:', err);
+              // Fall back to mock response
+              const fullResponse = getMockResponse(content);
+              let charIndex = 0;
+              const interval = setInterval(() => {
+                charIndex++;
+                const partialContent = fullResponse.slice(0, charIndex);
+                set((state) => ({
+                  conversations: state.conversations.map((c) =>
+                    c.id === conversationId
+                      ? {
+                          ...c,
+                          messages: c.messages.map((m) =>
+                            m.id === assistantMessageId
+                              ? { ...m, content: partialContent }
+                              : m
+                          ),
+                          updatedAt: new Date().toISOString(),
+                        }
+                      : c
+                  ),
+                }));
+                if (charIndex >= fullResponse.length) {
+                  clearInterval(interval);
+                  set({ isStreaming: false });
+                }
+              }, AI_RESPONSE_DELAY_MS);
+            }
+          })();
+        } else {
+          // Simulate streaming with context-aware mock response
+          const fullResponse = getMockResponse(content);
+          let charIndex = 0;
+
+          const interval = setInterval(() => {
+            charIndex++;
+            const partialContent = fullResponse.slice(0, charIndex);
+
+            set((state) => ({
+              conversations: state.conversations.map((c) =>
+                c.id === conversationId
+                  ? {
+                      ...c,
+                      messages: c.messages.map((m) =>
+                        m.id === assistantMessageId
+                          ? { ...m, content: partialContent }
+                          : m
+                      ),
+                      updatedAt: new Date().toISOString(),
+                    }
+                  : c
+              ),
+            }));
+
+            if (charIndex >= fullResponse.length) {
+              clearInterval(interval);
+              set({ isStreaming: false });
+            }
+          }, AI_RESPONSE_DELAY_MS);
+        }
       },
 
       editMessage: (conversationId, messageId, newContent) => {
@@ -227,9 +309,8 @@ export const useChatStore = create<ChatStore>()(
 
       regenerateMessage: (conversationId, messageId) => {
         const now = new Date().toISOString();
-        const fullResponse = getMockResponse('regenerate');
-        let charIndex = 0;
 
+        // Clear the message content and set streaming
         set((state) => ({
           conversations: state.conversations.map((c) =>
             c.id === conversationId
@@ -244,29 +325,110 @@ export const useChatStore = create<ChatStore>()(
           isStreaming: true,
         }));
 
-        const interval = setInterval(() => {
-          charIndex++;
-          const partialContent = fullResponse.slice(0, charIndex);
+        const apiKey = useUserStore.getState().user.anthropicApiKey;
 
-          set((state) => ({
-            conversations: state.conversations.map((c) =>
-              c.id === conversationId
-                ? {
-                    ...c,
-                    messages: c.messages.map((m) =>
-                      m.id === messageId ? { ...m, content: partialContent } : m
-                    ),
-                    updatedAt: now,
-                  }
-                : c
-            ),
-          }));
+        if (apiKey) {
+          const model = get().model;
+          const contextString = useContextStore.getState().getContextString();
+          const system =
+            'You are a world-class AI business coach and strategist for solopreneurs. Be direct, insightful, and actionable.\n\n' +
+            contextString;
 
-          if (charIndex >= fullResponse.length) {
-            clearInterval(interval);
-            set({ isStreaming: false });
-          }
-        }, AI_RESPONSE_DELAY_MS);
+          // Build messages array up to (but not including) the assistant message being regenerated
+          const conv = get().conversations.find((c) => c.id === conversationId);
+          const msgIndex = conv?.messages.findIndex((m) => m.id === messageId) ?? -1;
+          const history: Array<{ role: 'user' | 'assistant'; content: string }> =
+            (conv?.messages ?? [])
+              .slice(0, msgIndex)
+              .filter((m) => m.content.length > 0)
+              .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }));
+
+          const client = getAnthropicClient(apiKey);
+
+          (async () => {
+            try {
+              const stream = client.messages.stream({
+                model: resolveModelId(model),
+                max_tokens: 2048,
+                system,
+                messages: history,
+              });
+
+              stream.on('text', (text) => {
+                set((state) => ({
+                  conversations: state.conversations.map((c) =>
+                    c.id === conversationId
+                      ? {
+                          ...c,
+                          messages: c.messages.map((m) =>
+                            m.id === messageId
+                              ? { ...m, content: m.content + text }
+                              : m
+                          ),
+                          updatedAt: new Date().toISOString(),
+                        }
+                      : c
+                  ),
+                }));
+              });
+
+              await stream.done();
+              set({ isStreaming: false });
+            } catch (err) {
+              console.error('Anthropic stream error during regeneration, falling back to mock:', err);
+              const fullResponse = getMockResponse('regenerate');
+              let charIndex = 0;
+              const interval = setInterval(() => {
+                charIndex++;
+                const partialContent = fullResponse.slice(0, charIndex);
+                set((state) => ({
+                  conversations: state.conversations.map((c) =>
+                    c.id === conversationId
+                      ? {
+                          ...c,
+                          messages: c.messages.map((m) =>
+                            m.id === messageId ? { ...m, content: partialContent } : m
+                          ),
+                          updatedAt: now,
+                        }
+                      : c
+                  ),
+                }));
+                if (charIndex >= fullResponse.length) {
+                  clearInterval(interval);
+                  set({ isStreaming: false });
+                }
+              }, AI_RESPONSE_DELAY_MS);
+            }
+          })();
+        } else {
+          const fullResponse = getMockResponse('regenerate');
+          let charIndex = 0;
+
+          const interval = setInterval(() => {
+            charIndex++;
+            const partialContent = fullResponse.slice(0, charIndex);
+
+            set((state) => ({
+              conversations: state.conversations.map((c) =>
+                c.id === conversationId
+                  ? {
+                      ...c,
+                      messages: c.messages.map((m) =>
+                        m.id === messageId ? { ...m, content: partialContent } : m
+                      ),
+                      updatedAt: now,
+                    }
+                  : c
+              ),
+            }));
+
+            if (charIndex >= fullResponse.length) {
+              clearInterval(interval);
+              set({ isStreaming: false });
+            }
+          }, AI_RESPONSE_DELAY_MS);
+        }
       },
 
       setSelectedProfileId: (id) => set({ selectedProfileId: id }),

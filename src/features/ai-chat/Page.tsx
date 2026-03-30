@@ -285,7 +285,7 @@ export default function AIChatPage() {
 
   // ─── Welcome / Empty state ─────────────────────────────────────────────────
   const welcomeState = (
-    <div className="flex-1 flex flex-col items-center justify-center px-6 py-12">
+    <div className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 py-8 sm:py-12">
       <motion.div
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
@@ -299,7 +299,7 @@ export default function AIChatPage() {
           </div>
         </div>
 
-        <h1 className="text-3xl font-semibold text-foreground mb-2 tracking-tight">
+        <h1 className="text-2xl sm:text-3xl font-semibold text-foreground mb-2 tracking-tight">
           Your AI Solopreneur Coach
         </h1>
         <div className="mb-8">
@@ -307,7 +307,7 @@ export default function AIChatPage() {
         </div>
 
         {/* Starter prompts */}
-        <div className="grid grid-cols-2 gap-3 max-w-xl mx-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl mx-auto">
           {STARTER_PROMPTS.map((p) => (
             <button
               key={p.text}

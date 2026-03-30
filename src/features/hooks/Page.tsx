@@ -12,6 +12,7 @@ import {
   ArrowRight,
   Check,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,6 +21,9 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { cn, generateId } from '@/lib/utils';
+import { getAnthropicClient } from '@/lib/ai';
+import { useUserStore } from '@/stores/user';
+import { useContextStore } from '@/stores/context';
 import {
   useHooksStore,
   type ContentType,
@@ -524,6 +528,8 @@ function HistoryPanel({ history }: { history: HookSet[] }) {
 
 export default function HookGeneratorPage() {
   const { history, addHookSet, updateHookFeedback } = useHooksStore();
+  const { user } = useUserStore();
+  const { getContextString } = useContextStore();
 
   const [contentType, setContentType] = useState<ContentType>('hook');
   const [topic, setTopic] = useState('AI solopreneur coaching — how to replace your 9-5 using AI tools and consulting');
@@ -532,6 +538,7 @@ export default function HookGeneratorPage() {
   const [framework, setFramework] = useState<HookFramework>('contrarian');
   const [tone, setTone] = useState(2);
   const [generating, setGenerating] = useState(false);
+  const [usingAI, setUsingAI] = useState(false);
   const [currentHooks, setCurrentHooks] = useState<GeneratedHook[]>([]);
   const [currentSetId, setCurrentSetId] = useState<string>('');
 
@@ -566,21 +573,90 @@ export default function HookGeneratorPage() {
     if (!topic.trim()) return;
     setGenerating(true);
 
-    await new Promise((r) => setTimeout(r, 900));
-
     const opts: HookGenerationOptions = { contentType, topic, audience, emotions, framework, tone };
-    const hooks = generateHooks(opts);
-    setCurrentHooks(hooks);
 
-    const id = addHookSet({ options: opts, hooks });
-    setCurrentSetId(id);
+    if (user.anthropicApiKey) {
+      const toastId = toast.loading('Generating hooks with Claude AI…');
+      try {
+        const client = getAnthropicClient(user.anthropicApiKey);
+        const contextString = getContextString();
+        const frameworkLabel = FRAMEWORKS.find((f) => f.value === framework)?.label ?? framework;
+        const emotionLabel = emotions.map((e) => EMOTION_OPTIONS.find((o) => o.value === e)?.label ?? e).join(', ');
+        const toneLabels = ['Formal', 'Professional', 'Balanced', 'Casual', 'Raw'];
+        const toneLabel = toneLabels[tone] ?? 'Balanced';
+
+        const response = await client.messages.create({
+          model: 'claude-sonnet-4-5',
+          max_tokens: 2048,
+          system: 'You are a world-class copywriter and viral content strategist. Generate hooks using the exact framework requested.',
+          messages: [
+            {
+              role: 'user',
+              content: `Generate 10 viral ${frameworkLabel} hooks for:
+Topic: ${topic}
+Target Audience: ${audience}
+Desired Emotion: ${emotionLabel}
+Tone: ${toneLabel}
+
+Business Context:
+${contextString}
+
+Return ONLY a JSON array of 10 objects with this exact shape:
+[{ "text": "hook text here", "score": 85, "reasoning": "why this works" }]
+
+Each hook must be genuinely viral, specific, and use the ${frameworkLabel} framework correctly. Scores 70-99.`,
+            },
+          ],
+        });
+
+        const raw = response.content[0].type === 'text' ? response.content[0].text : '';
+        const jsonMatch = raw.match(/\[[\s\S]*\]/);
+        if (!jsonMatch) throw new Error('No JSON array found in response');
+
+        const parsed = JSON.parse(jsonMatch[0]) as { text: string; score: number; reasoning: string }[];
+
+        const emotion = FRAMEWORK_EMOTION_MAP[framework];
+        const hooks: GeneratedHook[] = parsed.map((item) => ({
+          id: generateId(),
+          text: item.text,
+          framework,
+          emotion,
+          score: Math.max(70, Math.min(99, item.score)),
+          scoreReason: item.reasoning,
+          feedback: null,
+        }));
+
+        setCurrentHooks(hooks);
+        setUsingAI(true);
+        const id = addHookSet({ options: opts, hooks });
+        setCurrentSetId(id);
+        toast.success('10 AI-powered hooks generated!', { id: toastId });
+      } catch (err) {
+        console.error('AI hook generation failed:', err);
+        toast.warning('AI generation failed — falling back to templates.', { id: toastId });
+        // Fallback to static generation
+        const hooks = generateHooks(opts);
+        setCurrentHooks(hooks);
+        setUsingAI(false);
+        const id = addHookSet({ options: opts, hooks });
+        setCurrentSetId(id);
+      }
+    } else {
+      await new Promise((r) => setTimeout(r, 900));
+      const hooks = generateHooks(opts);
+      setCurrentHooks(hooks);
+      setUsingAI(false);
+      const id = addHookSet({ options: opts, hooks });
+      setCurrentSetId(id);
+    }
+
     setGenerating(false);
-  }, [contentType, topic, audience, emotions, framework, tone, addHookSet]);
+  }, [contentType, topic, audience, emotions, framework, tone, addHookSet, user.anthropicApiKey, getContextString]);
 
   const TONE_LABELS = ['Formal', 'Professional', 'Balanced', 'Casual', 'Raw'];
 
   return (
-    <div className="min-h-screen bg-[#f5f0e8] p-6">
+    <div className="min-h-screen bg-[#f5f0e8] p-4 sm:p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-6">
@@ -732,9 +808,17 @@ export default function HookGeneratorPage() {
                   <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
                     Generated Hooks ({currentHooks.length})
                   </h2>
-                  <Badge variant="outline" className="text-xs">
-                    {FRAMEWORKS.find((f) => f.value === framework)?.label}
-                  </Badge>
+                  <div className="flex items-center gap-1.5">
+                    {usingAI && (
+                      <Badge className="text-xs bg-violet-100 text-violet-700 border-violet-200 gap-1">
+                        <Sparkles className="w-3 h-3" />
+                        AI
+                      </Badge>
+                    )}
+                    <Badge variant="outline" className="text-xs">
+                      {FRAMEWORKS.find((f) => f.value === framework)?.label}
+                    </Badge>
+                  </div>
                 </div>
                 <div className="flex flex-col gap-3">
                   <AnimatePresence mode="popLayout">

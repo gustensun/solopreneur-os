@@ -1044,8 +1044,7 @@ function LibrarySection() {
 
       {/* Masonry Grid */}
       <div
-        style={{ columnCount: 3, columnGap: '1rem' }}
-        className="[&>*]:break-inside-avoid [&>*]:mb-4"
+        className="columns-2 sm:columns-3 gap-4 [&>*]:break-inside-avoid [&>*]:mb-4"
       >
         {images.map((img) => (
           <motion.div
@@ -1119,7 +1118,7 @@ export default function ImageStudioPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Studio Header */}
       <div
-        className="px-6 py-5"
+        className="px-4 sm:px-6 py-4 sm:py-5"
         style={{ background: 'hsl(160 45% 8%)' }}
       >
         <div className="max-w-7xl mx-auto">
@@ -1168,7 +1167,7 @@ export default function ImageStudioPage() {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-6 py-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
         <AnimatePresence mode="wait">
           <motion.div
             key={mode}

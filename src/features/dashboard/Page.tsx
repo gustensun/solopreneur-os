@@ -318,7 +318,7 @@ export default function DashboardPage() {
         className="mb-8"
       >
         <p className="text-sm font-medium text-[#52b788]">{formatDate()}</p>
-        <h1 className="mt-0.5 text-3xl font-bold tracking-tight text-[#1b4332]">
+        <h1 className="mt-0.5 text-2xl sm:text-3xl font-bold tracking-tight text-[#1b4332]">
           {getGreeting()}, {user.name?.split(' ')[0] || 'Solopreneur'} 👋
         </h1>
         <p className="mt-1 text-sm text-[#6b7280]">
@@ -335,7 +335,7 @@ export default function DashboardPage() {
         {/* ── Left column ── */}
         <div className="flex flex-col gap-6 lg:col-span-2">
           {/* Revenue stat cards */}
-          <motion.div variants={item} className="grid grid-cols-3 gap-4">
+          <motion.div variants={item} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {/* Monthly Revenue */}
             <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#2d6a4f] to-[#1b4332] p-5 text-white shadow-md">
               <div className="mb-3 flex items-center gap-2">

@@ -16,6 +16,7 @@ import {
   Clock,
   Hash,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -29,6 +30,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn, generateId } from '@/lib/utils';
+import { getAnthropicClient } from '@/lib/ai';
+import { useUserStore } from '@/stores/user';
+import { useContextStore } from '@/stores/context';
 import {
   useEmailStudioStore,
   type SequenceType,
@@ -1113,7 +1117,7 @@ function SequenceConfigBar({
             className="overflow-hidden"
           >
             <div className="border-t border-border/40 px-4 py-4">
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
                 <div className="flex flex-col gap-1">
                   <Label htmlFor="cfg-name" className="text-xs font-medium">Your Name</Label>
                   <Input
@@ -1196,6 +1200,8 @@ function SequenceConfigBar({
 export default function EmailStudioPage() {
   const { sequences, activeSequenceId, addSequence, updateEmail, deleteSequence, setActiveSequence } =
     useEmailStudioStore();
+  const { user } = useUserStore();
+  const { getContextString } = useContextStore();
 
   const [activeTab, setActiveTab] = useState<SequenceType>('welcome');
   const [config, setConfig] = useState<ConfigValues>({
@@ -1206,6 +1212,7 @@ export default function EmailStudioPage() {
     brandVoice: 'conversational',
   });
   const [generating, setGenerating] = useState(false);
+  const [lastGeneratedWithAI, setLastGeneratedWithAI] = useState(false);
   const emailListRef = useRef<HTMLDivElement>(null);
 
   const activeSequence = sequences.find((s) => s.id === activeSequenceId) ?? null;
@@ -1217,31 +1224,136 @@ export default function EmailStudioPage() {
 
   const handleGenerate = useCallback(async () => {
     setGenerating(true);
-    await new Promise((r) => setTimeout(r, 700));
 
-    const emails = buildSequenceEmails(
-      activeTab,
-      config.authorName,
-      config.offerName,
-      config.price,
-      config.deadline,
-      config.brandVoice
-    );
+    if (user.anthropicApiKey) {
+      const toastId = toast.loading(`Generating ${tabMeta.label} with Claude AI…`);
+      try {
+        const client = getAnthropicClient(user.anthropicApiKey);
+        const contextString = getContextString();
+        const emailCount = tabMeta.count;
+        const sequenceDescriptions: Record<SequenceType, string> = {
+          welcome: 'Onboard new subscribers and build trust over 5 emails',
+          launch: 'Drive time-limited sales with urgency and social proof over 7 emails',
+          nurture: 'Deliver weekly value and nurture leads over 5 emails',
+          reengagement: 'Win back inactive subscribers over 3 emails',
+        };
+        const sequenceDescription = sequenceDescriptions[activeTab];
 
-    addSequence({
-      type: activeTab,
-      name: `${tabMeta.label} — ${config.offerName || 'My Offer'}`,
-      brandVoice: config.brandVoice,
-      emails,
-      authorName: config.authorName,
-      offerName: config.offerName,
-      price: config.price,
-      deadline: config.deadline,
-    });
+        const response = await client.messages.create({
+          model: 'claude-sonnet-4-5',
+          max_tokens: 6000,
+          system: 'You are a world-class email copywriter who writes high-converting sequences in the style of the best direct response marketers.',
+          messages: [
+            {
+              role: 'user',
+              content: `Write a complete ${tabMeta.label} email sequence for:
+Name: ${config.authorName || 'Your Name'}
+Offer: ${config.offerName || 'My Offer'} at $${config.price || '997'}
+Brand Voice: ${config.brandVoice}
+Sequence Type: ${tabMeta.label} (${sequenceDescription})
+${activeTab === 'launch' && config.deadline ? `Cart Deadline: ${config.deadline}` : ''}
+
+Business Context:
+${contextString}
+
+Return ONLY a JSON array where each item is:
+{
+  "subject": "Subject line",
+  "previewText": "Preview text 50 chars",
+  "body": "Full email body with personalization tokens like {first_name}",
+  "day": 1,
+  "timing": "Send immediately"
+}
+
+Write ${emailCount} emails. Make each email genuinely world-class — specific, emotional, and conversion-focused.`,
+            },
+          ],
+        });
+
+        const raw = response.content[0].type === 'text' ? response.content[0].text : '';
+        const jsonMatch = raw.match(/\[[\s\S]*\]/);
+        if (!jsonMatch) throw new Error('No JSON array found in response');
+
+        const parsed = JSON.parse(jsonMatch[0]) as {
+          subject: string;
+          previewText: string;
+          body: string;
+          day: number;
+          timing: string;
+        }[];
+
+        const emails: Omit<EmailItem, 'id'>[] = parsed.map((item, idx) => ({
+          number: idx + 1,
+          purpose: `Email ${idx + 1}`,
+          subjectLine: item.subject,
+          previewText: item.previewText,
+          body: item.body,
+          sendTiming: item.timing || `Day ${item.day}`,
+        }));
+
+        addSequence({
+          type: activeTab,
+          name: `${tabMeta.label} — ${config.offerName || 'My Offer'} ✨`,
+          brandVoice: config.brandVoice,
+          emails,
+          authorName: config.authorName,
+          offerName: config.offerName,
+          price: config.price,
+          deadline: config.deadline,
+        });
+
+        setLastGeneratedWithAI(true);
+        toast.success(`${tabMeta.label} generated with AI!`, { id: toastId });
+      } catch (err) {
+        console.error('AI email generation failed:', err);
+        toast.warning('AI generation failed — falling back to templates.', { id: toastId });
+
+        const emails = buildSequenceEmails(
+          activeTab,
+          config.authorName,
+          config.offerName,
+          config.price,
+          config.deadline,
+          config.brandVoice
+        );
+        addSequence({
+          type: activeTab,
+          name: `${tabMeta.label} — ${config.offerName || 'My Offer'}`,
+          brandVoice: config.brandVoice,
+          emails,
+          authorName: config.authorName,
+          offerName: config.offerName,
+          price: config.price,
+          deadline: config.deadline,
+        });
+        setLastGeneratedWithAI(false);
+      }
+    } else {
+      await new Promise((r) => setTimeout(r, 700));
+      const emails = buildSequenceEmails(
+        activeTab,
+        config.authorName,
+        config.offerName,
+        config.price,
+        config.deadline,
+        config.brandVoice
+      );
+      addSequence({
+        type: activeTab,
+        name: `${tabMeta.label} — ${config.offerName || 'My Offer'}`,
+        brandVoice: config.brandVoice,
+        emails,
+        authorName: config.authorName,
+        offerName: config.offerName,
+        price: config.price,
+        deadline: config.deadline,
+      });
+      setLastGeneratedWithAI(false);
+    }
 
     setGenerating(false);
     setTimeout(() => emailListRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
-  }, [activeTab, config, tabMeta, addSequence]);
+  }, [activeTab, config, tabMeta, addSequence, user.anthropicApiKey, getContextString]);
 
   const handleApplyConfig = useCallback(() => {
     if (!activeSequence) return;
@@ -1355,29 +1467,34 @@ export default function EmailStudioPage() {
         />
 
         {/* Generate Button */}
-        <Button
-          size="lg"
-          className="w-full gap-2 font-semibold text-base py-5 bg-[hsl(160_40%_12%)] hover:bg-[hsl(160_40%_18%)] text-white shadow-sm"
-          onClick={handleGenerate}
-          disabled={generating}
-        >
-          {generating ? (
-            <>
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ repeat: Infinity, duration: 0.8, ease: 'linear' }}
-              >
-                <Sparkles className="w-4 h-4" />
-              </motion.div>
-              Generating {tabMeta.label}…
-            </>
-          ) : (
-            <>
-              <Plus className="w-4 h-4" />
-              Generate {tabMeta.label} ({tabMeta.count} emails)
-            </>
+        <div className="flex flex-col gap-1.5">
+          <Button
+            size="lg"
+            className="w-full gap-2 font-semibold text-base py-5 bg-[hsl(160_40%_12%)] hover:bg-[hsl(160_40%_18%)] text-white shadow-sm"
+            onClick={handleGenerate}
+            disabled={generating}
+          >
+            {generating ? (
+              <>
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ repeat: Infinity, duration: 0.8, ease: 'linear' }}
+                >
+                  <Sparkles className="w-4 h-4" />
+                </motion.div>
+                {user.anthropicApiKey ? 'Generating with Claude AI…' : `Generating ${tabMeta.label}…`}
+              </>
+            ) : (
+              <>
+                {user.anthropicApiKey ? <Sparkles className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                {user.anthropicApiKey ? `✨ Generate with AI — ${tabMeta.label}` : `Generate ${tabMeta.label} (${tabMeta.count} emails)`}
+              </>
+            )}
+          </Button>
+          {user.anthropicApiKey && (
+            <p className="text-xs text-center text-muted-foreground">Powered by Claude AI — personalized to your business</p>
           )}
-        </Button>
+        </div>
 
         {/* Saved Sequences Navigation */}
         {sequences.length > 0 && (

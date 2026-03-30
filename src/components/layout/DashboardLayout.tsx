@@ -1,6 +1,7 @@
-import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import { useUserStore } from "@/stores/user";
 import {
   Bell,
   Settings,
@@ -59,6 +60,13 @@ const routeLabels: Record<string, string> = {
   assets: "Assets",
   settings: "Settings",
   admin: "Admin",
+  dashboard: "Dashboard",
+  "context-hub": "Context Hub",
+  "market-research": "Market Research",
+  "image-studio": "Image Studio",
+  hooks: "Hook Generator",
+  "email-studio": "Email Studio",
+  "copy-vault": "Copy Vault",
 };
 
 function Breadcrumb() {
@@ -116,6 +124,15 @@ export function DashboardLayout({
   const [notifOpen, setNotifOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const hasCompletedOnboarding = useUserStore((s) => s.hasCompletedOnboarding);
+  const user = useUserStore((s) => s.user);
+
+  useEffect(() => {
+    if (!hasCompletedOnboarding && location.pathname !== "/onboarding") {
+      navigate("/onboarding", { replace: true });
+    }
+  }, [hasCompletedOnboarding, location.pathname, navigate]);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
@@ -204,15 +221,15 @@ export function DashboardLayout({
                 <Button variant="ghost" size="icon" className="rounded-full" aria-label="User menu">
                   <Avatar className="w-8 h-8">
                     <AvatarFallback className="bg-[hsl(var(--sidebar-primary))]/20 text-[hsl(var(--sidebar-primary))] text-xs font-semibold">
-                      SO
+                      {user.initials}
                     </AvatarFallback>
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
                 <div className="px-3 py-2 border-b border-border">
-                  <p className="text-sm font-medium">Solopreneur</p>
-                  <p className="text-xs text-muted-foreground">hello@example.com</p>
+                  <p className="text-sm font-medium">{user.name}</p>
+                  <p className="text-xs text-muted-foreground">{user.email}</p>
                 </div>
                 <DropdownMenuItem asChild>
                   <Link to="/settings" className="flex items-center gap-2 cursor-pointer">

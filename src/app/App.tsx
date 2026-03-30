@@ -45,6 +45,9 @@ const AssetsPage = lazy(() => import("@/features/settings/AssetsPage"));
 const SettingsPage = lazy(() => import("@/features/settings/Page"));
 const AdminPage = lazy(() => import("@/features/settings/AdminPage"));
 
+// Onboarding
+const OnboardingPage = lazy(() => import("@/features/onboarding/Page"));
+
 // New power features
 const DashboardPage = lazy(() => import("@/features/dashboard/Page"));
 const ContextHubPage = lazy(() => import("@/features/context/Page"));
@@ -99,6 +102,16 @@ export default function App() {
             element={
               <Suspense fallback={<PageLoader />}>
                 <AuthPage />
+              </Suspense>
+            }
+          />
+
+          {/* Onboarding (no layout) */}
+          <Route
+            path="/onboarding"
+            element={
+              <Suspense fallback={<PageLoader />}>
+                <OnboardingPage />
               </Suspense>
             }
           />

@@ -284,4 +284,5 @@ export interface UserProfile {
   email: string;
   avatarUrl?: string;
   initials: string;
+  anthropicApiKey: string;
 }

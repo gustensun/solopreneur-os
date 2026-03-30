@@ -1,21 +1,42 @@
 import { useState, useRef } from "react";
 import { motion } from "framer-motion";
-import { User, Mail, Camera, Save, CheckCircle2 } from "lucide-react";
+import { User, Mail, Camera, Save, CheckCircle2, Eye, EyeOff, Key } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { useUserStore } from "@/stores/user";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 export default function SettingsPage() {
-  const { user, updateProfile, setAvatarUrl } = useUserStore();
+  const { user, updateProfile, setAvatarUrl, setApiKey } = useUserStore();
 
   const [name, setName] = useState(user.name);
   const [email, setEmail] = useState(user.email);
   const [saved, setSaved] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // API key state
+  const [apiKeyInput, setApiKeyInput] = useState(user.anthropicApiKey);
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [apiKeySaved, setApiKeySaved] = useState(false);
+
+  const isApiKeyDirty = apiKeyInput !== user.anthropicApiKey;
+
+  function getMaskedKey(key: string): string {
+    if (!key) return '';
+    const prefix = key.slice(0, 10);
+    return prefix + '****';
+  }
+
+  function handleSaveApiKey() {
+    setApiKey(apiKeyInput.trim());
+    setApiKeySaved(true);
+    toast.success("API key saved successfully");
+    setTimeout(() => setApiKeySaved(false), 2500);
+  }
 
   function getInitials(name: string) {
     return name
@@ -194,6 +215,100 @@ export default function SettingsPage() {
               You have unsaved changes
             </span>
           )}
+        </motion.div>
+
+        {/* AI Configuration */}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="glass-card p-6"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+              AI Configuration
+            </h2>
+            {user.anthropicApiKey ? (
+              <Badge className="bg-green-500/15 text-green-600 border-green-500/30 hover:bg-green-500/20">
+                Connected
+              </Badge>
+            ) : (
+              <Badge className="bg-orange-500/15 text-orange-600 border-orange-500/30 hover:bg-orange-500/20">
+                Not configured
+              </Badge>
+            )}
+          </div>
+
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="api-key">
+                <span className="flex items-center gap-1.5">
+                  <Key className="h-3.5 w-3.5" />
+                  Anthropic API Key
+                </span>
+              </Label>
+              <div className="flex items-center gap-2 max-w-sm">
+                <div className="relative flex-1">
+                  <Input
+                    id="api-key"
+                    type={showApiKey ? 'text' : 'password'}
+                    value={apiKeyInput}
+                    onChange={(e) => setApiKeyInput(e.target.value)}
+                    placeholder="sk-ant-api03-..."
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowApiKey((v) => !v)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    aria-label={showApiKey ? 'Hide API key' : 'Show API key'}
+                  >
+                    {showApiKey ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
+              </div>
+              {user.anthropicApiKey && !isApiKeyDirty && (
+                <p className="text-xs text-muted-foreground">
+                  Current key: {getMaskedKey(user.anthropicApiKey)}
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Your key is stored locally and never sent anywhere except the Anthropic API.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Button
+                onClick={handleSaveApiKey}
+                disabled={!isApiKeyDirty && !apiKeySaved}
+                className={cn(
+                  "transition-all",
+                  apiKeySaved && "bg-green-600 hover:bg-green-700"
+                )}
+              >
+                {apiKeySaved ? (
+                  <>
+                    <CheckCircle2 className="h-4 w-4" />
+                    Saved
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4" />
+                    Save API Key
+                  </>
+                )}
+              </Button>
+              {isApiKeyDirty && !apiKeySaved && (
+                <span className="text-xs text-muted-foreground">
+                  You have unsaved changes
+                </span>
+              )}
+            </div>
+          </div>
         </motion.div>
       </div>
     </div>

@@ -1115,11 +1115,11 @@ export default function ImageStudioPage() {
   const [mode, setMode] = useState<'ads' | 'carousel'>('ads');
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       {/* Studio Header */}
       <div
         className="px-4 sm:px-6 py-4 sm:py-5"
-        style={{ background: 'hsl(160 45% 8%)' }}
+        style={{ background: 'hsl(var(--forest))' }}
       >
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

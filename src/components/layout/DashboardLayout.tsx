@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUserStore } from "@/stores/user";
+import { useThemeStore } from "@/stores/theme";
 import {
   Bell,
   Settings,
@@ -9,6 +10,8 @@ import {
   Shield,
   ChevronRight,
   Menu,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { AppSidebar } from "./AppSidebar";
 import { cn } from "@/lib/utils";
@@ -128,6 +131,7 @@ export function DashboardLayout({
   const navigate = useNavigate();
   const hasCompletedOnboarding = useUserStore((s) => s.hasCompletedOnboarding);
   const user = useUserStore((s) => s.user);
+  const { theme, toggleTheme } = useThemeStore();
 
   useEffect(() => {
     // Only redirect brand-new users (no name set yet). Existing users who
@@ -172,6 +176,20 @@ export function DashboardLayout({
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Theme toggle */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleTheme}
+              aria-label="Toggle theme"
+            >
+              {theme === 'dark' ? (
+                <Sun className="w-4 h-4" />
+              ) : (
+                <Moon className="w-4 h-4" />
+              )}
+            </Button>
+
             {/* Notifications */}
             <DropdownMenu open={notifOpen} onOpenChange={setNotifOpen}>
               <DropdownMenuTrigger asChild>

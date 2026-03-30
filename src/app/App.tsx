@@ -1,4 +1,5 @@
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, useEffect } from "react";
+import { useThemeStore, applyTheme } from "@/stores/theme";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Toaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -85,6 +86,12 @@ function LayoutRoute({
 }
 
 export default function App() {
+  const theme = useThemeStore((s) => s.theme);
+
+  useEffect(() => {
+    applyTheme(theme);
+  }, []); // Apply on initial mount
+
   return (
     <BrowserRouter>
       <TooltipProvider delayDuration={300}>

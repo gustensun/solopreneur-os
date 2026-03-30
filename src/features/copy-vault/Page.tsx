@@ -603,7 +603,7 @@ export default function CopyVaultPage() {
   const catMeta = CATEGORIES.find((c) => c.value === activeCategory);
 
   return (
-    <div className="min-h-screen bg-[#f5f0e8] p-4 sm:p-6">
+    <div className="min-h-screen bg-background p-4 sm:p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-6">

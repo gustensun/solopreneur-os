@@ -1399,7 +1399,7 @@ Write ${emailCount} emails. Make each email genuinely world-class — specific, 
   };
 
   return (
-    <div className="min-h-screen bg-[#f5f0e8] p-4 sm:p-6">
+    <div className="min-h-screen bg-background p-4 sm:p-6">
       <div className="max-w-5xl mx-auto flex flex-col gap-5">
 
         {/* Page Header */}

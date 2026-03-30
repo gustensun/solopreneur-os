@@ -656,7 +656,7 @@ Each hook must be genuinely viral, specific, and use the ${frameworkLabel} frame
   const TONE_LABELS = ['Formal', 'Professional', 'Balanced', 'Casual', 'Raw'];
 
   return (
-    <div className="min-h-screen bg-[#f5f0e8] p-4 sm:p-6">
+    <div className="min-h-screen bg-background p-4 sm:p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-6">

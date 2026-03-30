@@ -309,7 +309,7 @@ export default function DashboardPage() {
   const checklistPct = Math.round((checklistDone / checklistItems.length) * 100);
 
   return (
-    <div className="min-h-full bg-[#faf9f6] px-4 pb-12 pt-6 md:px-8">
+    <div className="min-h-full bg-background px-4 pb-12 pt-6 md:px-8">
       {/* ── Welcome header ── */}
       <motion.div
         initial={{ opacity: 0, y: -12 }}

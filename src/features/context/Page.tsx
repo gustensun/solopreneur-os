@@ -172,7 +172,7 @@ export default function ContextHubPage() {
   const filledCount = sections.filter((s) => s.filled).length;
 
   return (
-    <div className="min-h-full bg-[#faf9f6] px-4 pb-12 pt-6 md:px-8">
+    <div className="min-h-full bg-background px-4 pb-12 pt-6 md:px-8">
       {/* ── Page header ── */}
       <motion.div
         initial={{ opacity: 0, y: -12 }}

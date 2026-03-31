@@ -20,6 +20,26 @@ import { Label } from "@/components/ui/label";
 import { useAuthStore } from "@/stores/auth";
 import { cn } from "@/lib/utils";
 
+// Detect whether Supabase env vars are actually configured
+const SUPABASE_CONFIGURED =
+  !!import.meta.env.VITE_SUPABASE_URL &&
+  !import.meta.env.VITE_SUPABASE_URL?.includes('placeholder');
+
+// Map raw Supabase error messages to friendly UI strings
+function friendlyError(msg: string): string {
+  if (msg.includes('Invalid login') || msg.includes('invalid_credentials') || msg.includes('Invalid email or password'))
+    return 'Incorrect email or password. Please try again.';
+  if (msg.includes('Email not confirmed'))
+    return 'Please verify your email before signing in. Check your inbox.';
+  if (msg.includes('already registered') || msg.includes('already been registered') || msg.includes('User already registered'))
+    return 'An account with this email already exists. Try signing in instead.';
+  if (msg.includes('Unable to connect') || msg.includes('Failed to fetch') || msg.includes('NetworkError'))
+    return 'Unable to connect. Check your internet connection and try again.';
+  if (msg.includes('Password should be'))
+    return 'Password must be at least 6 characters.';
+  return msg;
+}
+
 type Tab = "signin" | "signup" | "forgot" | "reset";
 
 export default function AuthPage() {
@@ -80,11 +100,7 @@ export default function AuthPage() {
     }
     const { error } = await signIn(signInEmail, signInPassword);
     if (error) {
-      setError(
-        error.includes("Invalid login") || error.includes("invalid_credentials")
-          ? "Incorrect email or password."
-          : error
-      );
+      setError(friendlyError(error));
     } else {
       navigate("/dashboard", { replace: true });
     }
@@ -107,11 +123,7 @@ export default function AuthPage() {
       signUpName
     );
     if (error) {
-      setError(
-        error.includes("already registered") || error.includes("already been registered")
-          ? "An account with this email already exists."
-          : error
-      );
+      setError(friendlyError(error));
     } else if (needsVerify) {
       setNeedsVerification(true);
     } else {
@@ -244,6 +256,19 @@ export default function AuthPage() {
             >
               Sign Up
             </button>
+          </div>
+        )}
+
+        {/* Supabase not configured warning */}
+        {!SUPABASE_CONFIGURED && (
+          <div className="mb-4 flex items-start gap-2.5 px-3 py-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-sm text-amber-700 dark:text-amber-400">
+            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+            <span>
+              <strong>Setup required:</strong> Add{" "}
+              <code className="text-xs bg-amber-100 dark:bg-amber-900/40 px-1 rounded">VITE_SUPABASE_URL</code> and{" "}
+              <code className="text-xs bg-amber-100 dark:bg-amber-900/40 px-1 rounded">VITE_SUPABASE_ANON_KEY</code>{" "}
+              to your environment variables.
+            </span>
           </div>
         )}
 

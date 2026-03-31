@@ -138,20 +138,33 @@ export function DashboardLayout({
   const { session, loading: authLoading, initialized } = useAuthStore();
 
   useEffect(() => {
-    // Redirect to auth if not logged in (once auth is initialized)
-    if (initialized && !authLoading && !session) {
+    if (!initialized) return; // Wait for Supabase to initialize before redirecting
+    if (authLoading) return;
+
+    // Not logged in → send to auth
+    if (!session) {
       navigate("/auth", { replace: true });
       return;
     }
-    // Only redirect brand-new users (no name set yet). Existing users who
-    // already have data are considered onboarded even if the flag is unset.
-    const isNewUser = !hasCompletedOnboarding && !user.name;
-    if (isNewUser && location.pathname !== "/onboarding") {
+
+    // Brand-new users who haven't completed onboarding → send to wizard
+    // Note: syncUserProfile auto-sets hasCompletedOnboarding for existing accounts,
+    // so this only fires for users who JUST signed up (account < 2 min old).
+    if (!hasCompletedOnboarding && location.pathname !== "/onboarding") {
       navigate("/onboarding", { replace: true });
     }
-  }, [session, authLoading, initialized, hasCompletedOnboarding, user.name, location.pathname, navigate]);
+  }, [session, authLoading, initialized, hasCompletedOnboarding, location.pathname, navigate]);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
+
+  // Show spinner while Supabase session is resolving — prevents content flash
+  if (!initialized || authLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <div className="w-7 h-7 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
